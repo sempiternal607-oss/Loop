@@ -1,0 +1,635 @@
+@import "tailwindcss";
+
+:root {
+  --background: #07080c;
+  --foreground: #f8fafc;
+  --surface: #0f111a;
+  --surface-subtle: #141724;
+  --border-subtle: rgba(255, 255, 255, 0.07);
+  --accent-emerald: #10b981;
+  --accent-cyan: #06b6d4;
+  --accent-glow: rgba(16, 185, 129, 0.35);
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  overflow-x: hidden;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+/* Custom sleek scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 9999px;
+  transition: background 0.2s ease;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Modern audio range scrubber slider */
+input[type='range'] {
+  accent-color: #10b981;
+  cursor: pointer;
+}
+
+/* Soundwave Equalizer Animations for Playing Tracks */
+@keyframes soundwave1 {
+  0%, 100% { height: 4px; }
+  50% { height: 14px; }
+}
+@keyframes soundwave2 {
+  0%, 100% { height: 14px; }
+  50% { height: 5px; }
+}
+@keyframes soundwave3 {
+  0%, 100% { height: 8px; }
+  50% { height: 16px; }
+}
+
+.animate-soundwave-1 {
+  animation: soundwave1 0.8s ease-in-out infinite;
+}
+.animate-soundwave-2 {
+  animation: soundwave2 0.7s ease-in-out infinite 0.15s;
+}
+.animate-soundwave-3 {
+  animation: soundwave3 0.9s ease-in-out infinite 0.3s;
+}
+
+@keyframes spinSlow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin-slow {
+  animation: spinSlow 14s linear infinite;
+}
+
+/* Ambient glass reflection utilities */
+.glass-panel {
+  background: rgba(13, 16, 26, 0.75);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: background 0.25s ease, border-color 0.25s ease;
+}
+
+.glass-card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.01) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-card:hover {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0.02) 100%);
+  border-color: rgba(16, 185, 129, 0.35);
+  box-shadow: 0 16px 32px -8px rgba(0, 0, 0, 0.6), 0 0 24px -4px rgba(16, 185, 129, 0.2);
+  transform: translateY(-2px);
+}
+
+/* ==========================================================================
+   LIGHT MODE: Minimalist Elegant White with Subtle Azure Blue Accents
+   ========================================================================== */
+html.light {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --surface: #ffffff;
+  --surface-subtle: #f1f5f9;
+  --border-subtle: rgba(226, 232, 240, 0.85);
+  --accent-blue: #2563eb;
+  --accent-blue-light: #3b82f6;
+  --accent-glow: rgba(37, 99, 235, 0.2);
+}
+
+/* 1. Base Layout & Typography in Light Mode */
+html.light body {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+/* Light mode scrollbar */
+html.light ::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.4);
+}
+html.light ::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.6);
+}
+
+/* Universal Range Slider Styling - Pixel-perfect alignment for track & thumb */
+input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent !important;
+  cursor: pointer;
+  height: 20px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  display: block;
+}
+
+input[type='range']:focus {
+  outline: none;
+}
+
+/* WebKit Track */
+input[type='range']::-webkit-slider-runnable-track {
+  width: 100%;
+  height: 6px;
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 9999px;
+  border: none;
+  cursor: pointer;
+}
+
+/* WebKit Thumb - Perfect vertical centering: margin-top = (6px track - 14px thumb) / 2 = -4px */
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background-color: #10b981;
+  margin-top: -4px;
+  border: none;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.6);
+  cursor: pointer;
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+
+input[type='range']:hover::-webkit-slider-thumb {
+  transform: scale(1.2);
+  background-color: #34d399;
+}
+
+/* Firefox Track */
+input[type='range']::-moz-range-track {
+  width: 100%;
+  height: 6px;
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 9999px;
+  border: none;
+  cursor: pointer;
+}
+
+/* Firefox Thumb */
+input[type='range']::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background-color: #10b981;
+  border: none;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.6);
+  cursor: pointer;
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+
+input[type='range']:hover::-moz-range-thumb {
+  transform: scale(1.2);
+  background-color: #34d399;
+}
+
+/* Light mode Range Slider: Crisp Slate-300 track with Royal/Azure Blue thumb */
+html.light input[type='range']::-webkit-slider-runnable-track {
+  background-color: #cbd5e1 !important;
+}
+
+html.light input[type='range']::-webkit-slider-thumb {
+  background-color: #2563eb !important;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.4) !important;
+}
+
+html.light input[type='range']:hover::-webkit-slider-thumb {
+  background-color: #1d4ed8 !important;
+}
+
+html.light input[type='range']::-moz-range-track {
+  background-color: #cbd5e1 !important;
+}
+
+html.light input[type='range']::-moz-range-thumb {
+  background-color: #2563eb !important;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.4) !important;
+}
+
+html.light input[type='range']:hover::-moz-range-thumb {
+  background-color: #1d4ed8 !important;
+}
+
+/* 2. Glassmorphism & Panels in Light Mode */
+html.light .glass-panel {
+  background: rgba(255, 255, 255, 0.88) !important;
+  backdrop-filter: blur(24px) !important;
+  -webkit-backdrop-filter: blur(24px) !important;
+  border: 1px solid rgba(226, 232, 240, 0.9) !important;
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.04), 0 4px 12px -2px rgba(0, 0, 0, 0.02) !important;
+}
+
+html.light .glass-card {
+  background: #ffffff !important;
+  border: 1px solid rgba(226, 232, 240, 0.85) !important;
+  box-shadow: 0 2px 10px -2px rgba(0, 0, 0, 0.04) !important;
+}
+
+html.light .glass-card:hover {
+  background: #ffffff !important;
+  border-color: rgba(59, 130, 246, 0.45) !important;
+  box-shadow: 0 14px 28px -6px rgba(37, 99, 235, 0.12), 0 0 20px -4px rgba(59, 130, 246, 0.15) !important;
+  transform: translateY(-2px);
+}
+
+/* 3. Global Structural Elements (Header, Sidebar, Player Bar, Mobile Nav) */
+html.light header {
+  background-color: rgba(255, 255, 255, 0.85) !important;
+  border-bottom-color: rgba(226, 232, 240, 0.9) !important;
+  backdrop-filter: blur(24px) !important;
+}
+
+html.light aside {
+  background-color: #ffffff !important;
+  border-right-color: rgba(226, 232, 240, 0.9) !important;
+  box-shadow: 2px 0 16px rgba(0, 0, 0, 0.02) !important;
+}
+
+html.light .fixed.bottom-0 {
+  background-color: rgba(255, 255, 255, 0.94) !important;
+  border-top-color: rgba(226, 232, 240, 0.9) !important;
+  box-shadow: 0 -10px 30px -5px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* 4. Text Contrast Adjustments in Light Mode */
+html.light .text-white {
+  color: #0f172a !important;
+}
+
+html.light .text-slate-100,
+html.light .text-zinc-100 {
+  color: #1e293b !important;
+}
+
+html.light .text-slate-200,
+html.light .text-zinc-200,
+html.light .text-slate-300,
+html.light .text-zinc-300 {
+  color: #334155 !important;
+}
+
+html.light .text-slate-400,
+html.light .text-zinc-400,
+html.light .text-slate-500,
+html.light .text-zinc-500 {
+  color: #64748b !important;
+}
+
+/* 5. Subtle Azure Blue Accents (Replacing Emerald in Light Mode) */
+html.light .text-emerald-400,
+html.light .text-emerald-500,
+html.light .text-emerald-300 {
+  color: #2563eb !important;
+}
+
+html.light .bg-emerald-400,
+html.light .bg-emerald-500 {
+  background-color: #2563eb !important;
+  color: #ffffff !important;
+}
+
+/* Ensure SVG icon inside the play button is white in light mode */
+html.light .bg-emerald-400 svg,
+html.light .bg-emerald-500 svg {
+  fill: #ffffff !important;
+  color: #ffffff !important;
+}
+
+html.light .border-emerald-400,
+html.light .border-emerald-500,
+html.light .border-emerald-500\/30,
+html.light .border-emerald-500\/40,
+html.light .border-emerald-500\/50 {
+  border-color: rgba(59, 130, 246, 0.4) !important;
+}
+
+html.light .bg-emerald-500\/10,
+html.light .bg-emerald-500\/15,
+html.light .bg-emerald-500\/20,
+html.light .bg-emerald-500\/\[0\.08\] {
+  background-color: rgba(37, 99, 235, 0.08) !important;
+  border-color: rgba(191, 219, 254, 0.8) !important;
+  color: #2563eb !important;
+}
+
+/* Soundwaves */
+html.light .animate-soundwave-1,
+html.light .animate-soundwave-2,
+html.light .animate-soundwave-3 {
+  background-color: #2563eb !important;
+}
+
+/* Favorites filled heart in light mode */
+html.light .fill-emerald-400 {
+  fill: #2563eb !important;
+  color: #2563eb !important;
+}
+
+/* 6. Form Inputs & Search */
+html.light input[type='text'] {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+  border-color: rgba(226, 232, 240, 0.9) !important;
+}
+html.light input[type='text']::placeholder {
+  color: #94a3b8 !important;
+}
+html.light input[type='text']:focus {
+  background-color: #ffffff !important;
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15) !important;
+}
+
+/* 7. Dark Card Surfaces to Clean White in Light Mode */
+html.light .bg-\[\#090B12\],
+html.light .bg-\[\#07080C\],
+html.light .bg-\[\#0d111a\],
+html.light .bg-\[\#121522\],
+html.light .bg-\[\#10131E\] {
+  background-color: #ffffff !important;
+}
+
+html.light .bg-white\/\[0\.02\],
+html.light .bg-white\/\[0\.03\],
+html.light .bg-white\/\[0\.04\],
+html.light .bg-white\/\[0\.05\],
+html.light .bg-white\/\[0\.06\],
+html.light .bg-white\/\[0\.07\],
+html.light .bg-white\/\[0\.08\] {
+  background-color: #ffffff !important;
+  border-color: rgba(226, 232, 240, 0.9) !important;
+  box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.03) !important;
+}
+
+html.light .border-white\/\[0\.06\],
+html.light .border-white\/\[0\.07\],
+html.light .border-white\/\[0\.08\],
+html.light .border-white\/\[0\.1\] {
+  border-color: rgba(226, 232, 240, 0.9) !important;
+}
+
+html.light .hover\:bg-white\/\[0\.04\]:hover,
+html.light .hover\:bg-white\/\[0\.05\]:hover,
+html.light .hover\:bg-white\/\[0\.06\]:hover,
+html.light .hover\:bg-white\/\[0\.07\]:hover,
+html.light .hover\:bg-white\/\[0\.08\]:hover,
+html.light .hover\:bg-white\/\[0\.1\]:hover {
+  background-color: #f8fafc !important;
+}
+
+/* 8. Light Mode Ambient Glow (Subtle Blue & Indigo) */
+html.light .bg-emerald-500\/\[0\.05\] {
+  background-color: rgba(59, 130, 246, 0.07) !important;
+}
+html.light .bg-indigo-600\/\[0\.04\] {
+  background-color: rgba(99, 102, 241, 0.04) !important;
+}
+html.light .bg-cyan-500\/\[0\.03\] {
+  background-color: rgba(56, 189, 248, 0.06) !important;
+}
+
+/* 9. Dropdown menus and suggestions */
+html.light .bg-\[\#10131E\]\/95 {
+  background-color: rgba(255, 255, 255, 0.96) !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 20px 35px -5px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* 10. Modals & Drawers */
+html.light .bg-\[\#0d111a\] {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+
+/* Hover typography consistency */
+html.light .hover\:text-white:hover {
+  color: #0f172a !important;
+}
+html.light .group:hover .group-hover\:text-white {
+  color: #0f172a !important;
+}
+html.light .group:hover .group-hover\:text-zinc-300 {
+  color: #475569 !important;
+}
+html.light .group:hover .group-hover\:text-emerald-400,
+html.light .group:hover .group-hover\:text-emerald-300 {
+  color: #2563eb !important;
+}
+
+/* 11. Featured Spotlight Hero Banner in Light Mode */
+html.light .featured-banner {
+  background: linear-gradient(135deg, #ffffff 0%, #f0f7ff 50%, #eff6ff 100%) !important;
+  border-color: rgba(191, 219, 254, 0.8) !important;
+  box-shadow: 0 14px 34px -10px rgba(37, 99, 235, 0.1), 0 4px 12px -2px rgba(0, 0, 0, 0.03) !important;
+}
+html.light .featured-banner h1 {
+  color: #0f172a !important;
+  text-shadow: none !important;
+}
+html.light .featured-banner p {
+  color: #475569 !important;
+}
+html.light .featured-banner p span {
+  color: #0f172a !important;
+  text-decoration-color: rgba(37, 99, 235, 0.6) !important;
+}
+html.light .featured-ambient-1 {
+  background-color: rgba(147, 197, 253, 0.35) !important;
+}
+html.light .featured-ambient-2 {
+  background-color: rgba(199, 210, 254, 0.3) !important;
+}
+html.light .featured-badge {
+  background-color: #dbeafe !important;
+  color: #1d4ed8 !important;
+  border-color: #bfdbfe !important;
+  box-shadow: none !important;
+}
+html.light .featured-badge svg {
+  color: #2563eb !important;
+}
+html.light .featured-cta {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 8px 20px -4px rgba(37, 99, 235, 0.4) !important;
+}
+html.light .featured-cta svg {
+  fill: #ffffff !important;
+  color: #ffffff !important;
+}
+html.light .featured-cta:hover {
+  background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%) !important;
+  box-shadow: 0 12px 24px -4px rgba(37, 99, 235, 0.5) !important;
+}
+html.light .featured-vinyl-center {
+  background-color: #eff6ff !important;
+  border-color: #bfdbfe !important;
+}
+html.light .featured-vinyl-center svg {
+  color: #2563eb !important;
+}
+
+/* 12. Fullscreen Now Playing Modal in Light Mode */
+html.light .fullscreen-player-modal {
+  background-color: rgba(248, 250, 252, 0.98) !important;
+  color: #0f172a !important;
+}
+html.light .fullscreen-ambient-bg {
+  opacity: 0.14 !important;
+}
+html.light .fullscreen-vignette-overlay {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(248, 250, 252, 0.4) 40%, rgba(255, 255, 255, 0.98) 100%) !important;
+}
+html.light .fullscreen-minimize-btn {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  color: #334155 !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04) !important;
+}
+html.light .fullscreen-minimize-btn:hover {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+html.light .fullscreen-header-meta span:first-child {
+  color: #2563eb !important;
+}
+html.light .fullscreen-header-meta span:last-child {
+  color: #334155 !important;
+}
+html.light .fullscreen-song-title {
+  color: #0f172a !important;
+}
+html.light .fullscreen-song-artist {
+  color: #64748b !important;
+}
+html.light .fullscreen-song-artist:hover {
+  color: #2563eb !important;
+}
+html.light .fullscreen-timestamps {
+  color: #64748b !important;
+}
+html.light .fullscreen-play-btn {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
+  color: #ffffff !important;
+  box-shadow: 0 10px 24px -4px rgba(37, 99, 235, 0.45) !important;
+}
+html.light .fullscreen-play-btn svg {
+  fill: #ffffff !important;
+  color: #ffffff !important;
+}
+html.light .fullscreen-ctrl-btn {
+  color: #475569 !important;
+}
+html.light .fullscreen-ctrl-btn:hover {
+  color: #0f172a !important;
+}
+html.light .fullscreen-lyrics-card {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.05) !important;
+}
+html.light .fullscreen-lyrics-card:hover {
+  border-color: rgba(59, 130, 246, 0.45) !important;
+  box-shadow: 0 10px 28px -4px rgba(37, 99, 235, 0.12) !important;
+}
+html.light .fullscreen-lyrics-card .text-slate-200 {
+  color: #1e293b !important;
+}
+html.light .fullscreen-queue-btn {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  color: #334155 !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04) !important;
+}
+html.light .fullscreen-queue-btn:hover {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+/* 13. Bottom Player Bar (Desktop & Mobile) in Light Mode */
+html.light .desktop-player-bar {
+  background-color: rgba(255, 255, 255, 0.96) !important;
+  border-top-color: #e2e8f0 !important;
+  box-shadow: 0 -8px 24px -4px rgba(0, 0, 0, 0.06) !important;
+}
+html.light .desktop-player-bar .text-zinc-300,
+html.light .desktop-player-bar .text-zinc-400 {
+  color: #64748b !important;
+}
+html.light .desktop-player-bar .hover\:text-white:hover {
+  color: #0f172a !important;
+}
+html.light .desktop-player-bar .border-l {
+  border-left-color: #e2e8f0 !important;
+}
+html.light .desktop-player-bar .font-mono {
+  color: #64748b !important;
+}
+
+html.light .mobile-player-bar {
+  background-color: rgba(255, 255, 255, 0.96) !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 12px 32px -4px rgba(0, 0, 0, 0.08), 0 0 1px 1px rgba(0, 0, 0, 0.04) !important;
+}
+html.light .mobile-player-bar .text-zinc-400 {
+  color: #64748b !important;
+}
+html.light .mobile-player-bar .hover\:text-white:hover {
+  color: #0f172a !important;
+}
+html.light .mobile-player-bar > div:first-child {
+  background-color: #e2e8f0 !important;
+}
+
+/* 14. Synced Lyrics & Queue Drawers in Light Mode */
+html.light .lyrics-drawer {
+  background-color: rgba(248, 250, 252, 0.98) !important;
+  color: #0f172a !important;
+}
+html.light .lyrics-vignette-overlay {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 250, 252, 0.5) 45%, rgba(255, 255, 255, 0.98) 100%) !important;
+}
+html.light .lyric-active-text {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+}
+
+html.light .queue-drawer {
+  background-color: #ffffff !important;
+  border-left-color: #e2e8f0 !important;
+  box-shadow: -12px 0 35px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* 15. Modals (AddToPlaylist & Album) in Light Mode */
+html.light .playlist-modal,
+html.light .album-modal {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15) !important;
+}

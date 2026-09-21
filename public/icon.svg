@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10B981" />
+      <stop offset="50%" stop-color="#06B6D4" />
+      <stop offset="100%" stop-color="#6366F1" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="15" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="128" fill="#0b0f19" />
+  <!-- Infinity Loop Shape representing Loop Music -->
+  <path d="M160 192 C 100 192, 60 220, 60 256 C 60 292, 100 320, 160 320 C 220 320, 256 256, 256 256 C 256 256, 292 192, 352 192 C 412 192, 452 220, 452 256 C 452 292, 412 320, 352 320 C 292 320, 256 256, 256 256 C 256 256, 220 192, 160 192 Z"
+        fill="none"
+        stroke="url(#grad)"
+        stroke-width="38"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        filter="url(#glow)" />
+  <!-- Music Note in center right loop -->
+  <circle cx="352" cy="256" r="16" fill="#10B981" />
+  <circle cx="160" cy="256" r="16" fill="#6366F1" />
+</svg>

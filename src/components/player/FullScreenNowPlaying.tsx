@@ -1,0 +1,246 @@
+'use client';
+
+import React from 'react';
+import Image from 'next/image';
+import { useRouter } from 'next/navigation';
+import {
+  ChevronDown,
+  Heart,
+  Play,
+  Pause,
+  SkipBack,
+  SkipForward,
+  Shuffle,
+  Repeat,
+  Repeat1,
+  Mic2,
+  ListMusic,
+  ListPlus,
+} from 'lucide-react';
+import { usePlayer } from '@/context/PlayerContext';
+import { usePlaylist } from '@/context/PlaylistContext';
+import { formatDuration } from '@/lib/ytmusic';
+
+export function FullScreenNowPlaying() {
+  const router = useRouter();
+  const {
+    currentSong,
+    isPlaying,
+    progress,
+    duration,
+    repeatMode,
+    isShuffle,
+    lyrics,
+    isFullScreenPlayerOpen,
+    closeFullScreen,
+    togglePlay,
+    next,
+    prev,
+    seek,
+    toggleRepeat,
+    toggleShuffle,
+    toggleFavorite,
+    isFavorite,
+    openLyrics,
+    openQueue,
+  } = usePlayer();
+  const { openAddToPlaylistModal } = usePlaylist();
+
+  if (!isFullScreenPlayerOpen || !currentSong) return null;
+
+  const isLiked = isFavorite(currentSong.videoId);
+
+  // Find currently active lyric line for preview
+  const currentLine = lyrics?.synced
+    ? [...lyrics.lines].reverse().find((line) => progress >= line.time)
+    : null;
+
+  return (
+    <div className="fullscreen-player-modal fixed inset-0 z-50 bg-[#07080C]/95 backdrop-blur-3xl flex flex-col justify-between p-6 sm:p-10 animate-in slide-in-from-bottom duration-300 overflow-y-auto">
+      {/* Ambient Gradient Backdrop */}
+      <div
+        className="fullscreen-ambient-bg absolute inset-0 opacity-25 pointer-events-none blur-[100px] scale-125 transition-all duration-700"
+        style={{
+          backgroundImage: `url(${currentSong.thumbnail})`,
+          backgroundPosition: 'center',
+          backgroundSize: 'cover',
+        }}
+      />
+      {/* Subtle Dark Vignette Overlay */}
+      <div className="fullscreen-vignette-overlay absolute inset-0 bg-gradient-to-b from-[#07080C]/60 via-transparent to-[#07080C]/90 pointer-events-none -z-0" />
+
+      {/* Top Bar: Minimize button & Header */}
+      <div className="relative flex items-center justify-between z-10 w-full max-w-xl mx-auto">
+        <button
+          type="button"
+          onClick={closeFullScreen}
+          className="fullscreen-minimize-btn w-10 h-10 rounded-2xl bg-white/[0.05] border border-white/[0.08] hover:bg-white/[0.1] text-slate-300 hover:text-white flex items-center justify-center transition-all active:scale-95"
+          title="Minimize player"
+        >
+          <ChevronDown className="w-5 h-5" />
+        </button>
+
+        <div className="fullscreen-header-meta flex flex-col items-center">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">Playing from Loop</span>
+          <span className="text-xs font-semibold text-slate-200 truncate max-w-[220px]">
+            {currentSong.album || 'Now Playing'}
+          </span>
+        </div>
+
+        {/* Balance spacer */}
+        <div className="w-10 h-10" />
+      </div>
+
+      {/* Center: Large Artwork & Song Info */}
+      <div className="relative flex flex-col items-center my-auto py-6 z-10 w-full max-w-sm mx-auto">
+        <div className="relative w-64 h-64 sm:w-80 sm:h-80 rounded-3xl overflow-hidden shadow-2xl shadow-emerald-500/10 border border-white/[0.1] mb-8 group">
+          <Image
+            src={currentSong.thumbnail}
+            alt={currentSong.title}
+            fill
+            sizes="(max-width: 640px) 256px, 320px"
+            className="object-cover"
+            priority
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
+        </div>
+
+        <div className="flex items-center justify-between w-full px-2">
+          <div className="flex flex-col overflow-hidden pr-4">
+            <h2 className="fullscreen-song-title text-xl sm:text-2xl font-black text-white truncate leading-tight tracking-tight">
+              {currentSong.title}
+            </h2>
+            <p
+              onClick={() => {
+                closeFullScreen();
+                const target = currentSong.artists?.[0]?.browseId || encodeURIComponent(currentSong.artist);
+                router.push(`/artist/${target}`);
+              }}
+              className="fullscreen-song-artist text-sm sm:text-base text-slate-400 font-medium truncate mt-1 hover:text-emerald-400 hover:underline cursor-pointer transition-colors"
+            >
+              {currentSong.artist}
+            </p>
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              type="button"
+              onClick={() => openAddToPlaylistModal(currentSong)}
+              className="p-3 text-slate-400 hover:text-emerald-400 transition-all active:scale-90"
+              title="Add to playlist"
+            >
+              <ListPlus className="w-6 h-6" />
+            </button>
+            <button
+              type="button"
+              onClick={() => toggleFavorite(currentSong)}
+              className="p-3 text-slate-400 hover:text-white transition-all active:scale-90"
+              title="Favorite"
+            >
+              <Heart className={`w-7 h-7 transition-colors ${isLiked ? 'text-emerald-400 fill-emerald-400' : ''}`} />
+            </button>
+          </div>
+        </div>
+
+        {/* Seek Bar & Timestamps */}
+        <div className="w-full mt-6 px-2">
+          <input
+            type="range"
+            min={0}
+            max={duration || 100}
+            value={progress}
+            onChange={(e) => seek(Number(e.target.value))}
+            className="player-slider w-full cursor-pointer"
+          />
+          <div className="fullscreen-timestamps flex justify-between items-center text-xs text-slate-400 font-mono mt-2.5">
+            <span>{formatDuration(progress)}</span>
+            <span>{formatDuration(duration)}</span>
+          </div>
+        </div>
+
+        {/* Controls: Shuffle, Prev, Play/Pause, Next, Repeat */}
+        <div className="flex items-center justify-between w-full mt-6 px-4">
+          <button
+            type="button"
+            onClick={toggleShuffle}
+            className={`fullscreen-ctrl-btn p-2 transition-colors relative ${isShuffle ? 'text-emerald-400' : 'text-slate-400 hover:text-white'}`}
+            title={isShuffle ? 'Smart Shuffle Enabled' : 'Smart Shuffle Disabled'}
+          >
+            <Shuffle className="w-5 h-5" />
+            {isShuffle && <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-emerald-400" />}
+          </button>
+
+          <button
+            type="button"
+            onClick={prev}
+            className="fullscreen-ctrl-btn p-3 text-white hover:text-emerald-400 transition-colors active:scale-95"
+          >
+            <SkipBack className="w-7 h-7 fill-current" />
+          </button>
+
+          <button
+            type="button"
+            onClick={togglePlay}
+            className="fullscreen-play-btn w-16 h-16 rounded-full bg-gradient-to-tr from-emerald-400 to-emerald-300 text-slate-950 flex items-center justify-center shadow-xl shadow-emerald-500/30 hover:scale-105 active:scale-95 transition-all"
+          >
+            {isPlaying ? (
+              <Pause className="w-7 h-7 fill-slate-950" />
+            ) : (
+              <Play className="w-7 h-7 fill-slate-950 translate-x-0.5" />
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={next}
+            className="fullscreen-ctrl-btn p-3 text-white hover:text-emerald-400 transition-colors active:scale-95"
+          >
+            <SkipForward className="w-7 h-7 fill-current" />
+          </button>
+
+          <button
+            type="button"
+            onClick={toggleRepeat}
+            className={`fullscreen-ctrl-btn p-2 transition-colors relative ${repeatMode !== 'off' ? 'text-emerald-400' : 'text-slate-400 hover:text-white'}`}
+            title={`Repeat mode: ${repeatMode}`}
+          >
+            {repeatMode === 'one' ? <Repeat1 className="w-5 h-5" /> : <Repeat className="w-5 h-5" />}
+            {repeatMode !== 'off' && <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-emerald-400" />}
+          </button>
+        </div>
+      </div>
+
+      {/* Bottom Actions: Synced Lyrics Card Preview & Queue Button */}
+      <div className="relative flex flex-col gap-3 w-full max-w-sm mx-auto z-10 mt-auto">
+        {/* Karaoke Preview Card */}
+        <div
+          onClick={openLyrics}
+          className="fullscreen-lyrics-card glass-card rounded-2xl p-4 cursor-pointer transition-all border border-white/[0.08] hover:border-emerald-500/40 flex items-center justify-between gap-3 group shadow-lg"
+        >
+          <div className="flex items-center gap-3 overflow-hidden">
+            <div className="p-2.5 rounded-xl bg-emerald-500/15 text-emerald-400 shrink-0 border border-emerald-500/20">
+              <Mic2 className="w-4 h-4" />
+            </div>
+            <div className="flex flex-col overflow-hidden">
+              <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Synced Lyrics</span>
+              <span className="text-sm font-semibold text-slate-200 truncate group-hover:text-white transition-colors">
+                {currentLine ? currentLine.text : 'Tap to open full synchronized lyrics'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Queue quick link */}
+        <div className="flex justify-center">
+          <button
+            type="button"
+            onClick={openQueue}
+            className="fullscreen-queue-btn flex items-center gap-2 text-xs font-semibold text-slate-300 hover:text-white py-2 px-5 rounded-full bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] transition-all active:scale-95"
+          >
+            <ListMusic className="w-4 h-4 text-emerald-400" />
+            <span>Open Queue</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
