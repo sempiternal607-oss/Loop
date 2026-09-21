@@ -74,7 +74,6 @@ export function YouTubePlayer() {
 
   const playerRef = useRef<YTPlayerInstance | null>(null);
   const isReadyRef = useRef<boolean>(false);
-  const audioAnchorRef = useRef<HTMLAudioElement | null>(null);
   const isPlayingRef = useRef(isPlaying);
   isPlayingRef.current = isPlaying;
   const skippedSegmentsRef = useRef<Set<string>>(new Set());
@@ -111,28 +110,16 @@ export function YouTubePlayer() {
             if (e.data === window.YT.PlayerState.PLAYING) {
               isChangingTrackRef.current = false;
               _setIsPlaying(true);
-              audioAnchorRef.current?.play().catch(() => {});
             } else if (e.data === window.YT.PlayerState.PAUSED) {
               // Ignore transient PAUSED state during track loading transition
               if (isChangingTrackRef.current) {
                 playerRef.current?.playVideo();
                 return;
               }
-              // If paused automatically by browser when screen is locked or app minimized, auto-resume!
-              if (document.visibilityState === 'hidden' && isPlayingRef.current) {
-                try {
-                  playerRef.current?.playVideo();
-                } catch (err) {
-                  console.warn('[YouTube Player] Background auto-resume failed', err);
-                }
-                return;
-              }
               _setIsPlaying(false);
-              audioAnchorRef.current?.pause();
             } else if (e.data === window.YT.PlayerState.CUED) {
               // Video cued, start playing immediately
               playerRef.current?.playVideo();
-              audioAnchorRef.current?.play().catch(() => {});
             } else if (e.data === window.YT.PlayerState.ENDED) {
               isChangingTrackRef.current = false;
               if (repeatModeRef.current === 'one') {
@@ -140,7 +127,6 @@ export function YouTubePlayer() {
                 playerRef.current?.playVideo();
                 _setProgress(0);
                 _setIsPlaying(true);
-                audioAnchorRef.current?.play().catch(() => {});
               } else {
                 _handleSongEnded();
               }
@@ -198,10 +184,8 @@ export function YouTubePlayer() {
     try {
       if (isPlaying) {
         playerRef.current.playVideo();
-        audioAnchorRef.current?.play().catch(() => {});
       } else {
         playerRef.current.pauseVideo();
-        audioAnchorRef.current?.pause();
       }
     } catch (e) {
       console.error(e);
@@ -259,6 +243,23 @@ export function YouTubePlayer() {
 
         if (typeof duration === 'number' && !isNaN(duration) && duration > 0) {
           _setDuration(duration);
+
+          // Update MediaSession with actual song duration and current playback position
+          if (
+            'mediaSession' in navigator &&
+            'setPositionState' in navigator.mediaSession &&
+            duration > 0
+          ) {
+            try {
+              navigator.mediaSession.setPositionState({
+                duration: duration,
+                playbackRate: 1,
+                position: Math.min(currentTime, duration),
+              });
+            } catch {
+              // Ignore invalid range state
+            }
+          }
         }
       } catch (e) {
         // Player state not yet accessible
@@ -286,12 +287,10 @@ export function YouTubePlayer() {
     navigator.mediaSession.setActionHandler('play', () => {
       resume();
       playerRef.current?.playVideo();
-      audioAnchorRef.current?.play().catch(() => {});
     });
     navigator.mediaSession.setActionHandler('pause', () => {
       pause();
       playerRef.current?.pauseVideo();
-      audioAnchorRef.current?.pause();
     });
     navigator.mediaSession.setActionHandler('nexttrack', () => next());
     navigator.mediaSession.setActionHandler('previoustrack', () => prev());
@@ -299,6 +298,16 @@ export function YouTubePlayer() {
       if (details.seekTime !== undefined && details.seekTime !== null) {
         playerRef.current?.seekTo(details.seekTime, true);
         _setProgress(details.seekTime);
+        if ('mediaSession' in navigator && 'setPositionState' in navigator.mediaSession) {
+          try {
+            const d = playerRef.current?.getDuration() || 0;
+            navigator.mediaSession.setPositionState({
+              duration: d,
+              playbackRate: 1,
+              position: Math.min(details.seekTime, d),
+            });
+          } catch {}
+        }
       }
     });
 
@@ -334,7 +343,6 @@ export function YouTubePlayer() {
             // Ignore
           }
         }
-        audioAnchorRef.current?.play().catch(() => {});
       }
     };
 
@@ -345,23 +353,12 @@ export function YouTubePlayer() {
   }, []);
 
   return (
-    <>
-      {/* Background Audio Anchor to maintain PWA/Mobile OS audio session during lock screen */}
-      <audio
-        ref={audioAnchorRef}
-        src="/silence.wav"
-        loop
-        preload="auto"
-        className="hidden"
-        aria-hidden="true"
-      />
-      <div
-        id="loop-yt-holder"
-        className="fixed bottom-0 right-0 w-8 h-8 opacity-[0.01] pointer-events-none overflow-hidden z-[-1]"
-        aria-hidden="true"
-      >
-        <div id="loop-yt-iframe" />
-      </div>
-    </>
+    <div
+      id="loop-yt-holder"
+      className="fixed bottom-0 right-0 w-8 h-8 opacity-[0.01] pointer-events-none overflow-hidden z-[-1]"
+      aria-hidden="true"
+    >
+      <div id="loop-yt-iframe" />
+    </div>
   );
 }
