@@ -74,6 +74,9 @@ export function YouTubePlayer() {
 
   const playerRef = useRef<YTPlayerInstance | null>(null);
   const isReadyRef = useRef<boolean>(false);
+  const audioAnchorRef = useRef<HTMLAudioElement | null>(null);
+  const isPlayingRef = useRef(isPlaying);
+  isPlayingRef.current = isPlaying;
   const skippedSegmentsRef = useRef<Set<string>>(new Set());
   const lastTrackIdRef = useRef<string | null>(null);
   const isChangingTrackRef = useRef<boolean>(false);
@@ -97,6 +100,7 @@ export function YouTubePlayer() {
           rel: 0,
           iv_load_policy: 3,
           fs: 0,
+          autoplay: 1,
         },
         events: {
           onReady: (e) => {
@@ -107,16 +111,28 @@ export function YouTubePlayer() {
             if (e.data === window.YT.PlayerState.PLAYING) {
               isChangingTrackRef.current = false;
               _setIsPlaying(true);
+              audioAnchorRef.current?.play().catch(() => {});
             } else if (e.data === window.YT.PlayerState.PAUSED) {
               // Ignore transient PAUSED state during track loading transition
               if (isChangingTrackRef.current) {
                 playerRef.current?.playVideo();
                 return;
               }
+              // If paused automatically by browser when screen is locked or app minimized, auto-resume!
+              if (document.visibilityState === 'hidden' && isPlayingRef.current) {
+                try {
+                  playerRef.current?.playVideo();
+                } catch (err) {
+                  console.warn('[YouTube Player] Background auto-resume failed', err);
+                }
+                return;
+              }
               _setIsPlaying(false);
+              audioAnchorRef.current?.pause();
             } else if (e.data === window.YT.PlayerState.CUED) {
               // Video cued, start playing immediately
               playerRef.current?.playVideo();
+              audioAnchorRef.current?.play().catch(() => {});
             } else if (e.data === window.YT.PlayerState.ENDED) {
               isChangingTrackRef.current = false;
               if (repeatModeRef.current === 'one') {
@@ -124,6 +140,7 @@ export function YouTubePlayer() {
                 playerRef.current?.playVideo();
                 _setProgress(0);
                 _setIsPlaying(true);
+                audioAnchorRef.current?.play().catch(() => {});
               } else {
                 _handleSongEnded();
               }
@@ -181,8 +198,10 @@ export function YouTubePlayer() {
     try {
       if (isPlaying) {
         playerRef.current.playVideo();
+        audioAnchorRef.current?.play().catch(() => {});
       } else {
         playerRef.current.pauseVideo();
+        audioAnchorRef.current?.pause();
       }
     } catch (e) {
       console.error(e);
@@ -249,22 +268,7 @@ export function YouTubePlayer() {
     return () => clearInterval(interval);
   }, [isPlaying, sponsorBlockEnabled, activeSegments, _setProgress, _setDuration, showToast]);
 
-  // Helper to detect PWA mode or mobile device
-  const isPWAOrMobile = () => {
-    if (typeof window === 'undefined') return false;
-    const isStandalone =
-      window.matchMedia('(display-mode: standalone)').matches ||
-      window.matchMedia('(display-mode: fullscreen)').matches ||
-      window.matchMedia('(display-mode: minimal-ui)').matches ||
-      Boolean((window.navigator as unknown as { standalone?: boolean }).standalone) ||
-      document.referrer.includes('android-app://');
-    const isMobile =
-      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-      (navigator.maxTouchPoints > 1 && /Macintosh/i.test(navigator.userAgent));
-    return isStandalone || isMobile;
-  };
-
-  // 7. MediaSession API integration for System Notifications & Controls
+  // 7. MediaSession API integration for System Notifications & Lock Screen Controls
   useEffect(() => {
     if (typeof window === 'undefined' || !('mediaSession' in navigator) || !currentSong) return;
 
@@ -280,13 +284,15 @@ export function YouTubePlayer() {
     });
 
     navigator.mediaSession.setActionHandler('play', () => {
-      // Disallow background playback if phone screen is locked or hidden
-      if (document.visibilityState === 'hidden' && isPWAOrMobile()) {
-        return;
-      }
       resume();
+      playerRef.current?.playVideo();
+      audioAnchorRef.current?.play().catch(() => {});
     });
-    navigator.mediaSession.setActionHandler('pause', () => pause());
+    navigator.mediaSession.setActionHandler('pause', () => {
+      pause();
+      playerRef.current?.pauseVideo();
+      audioAnchorRef.current?.pause();
+    });
     navigator.mediaSession.setActionHandler('nexttrack', () => next());
     navigator.mediaSession.setActionHandler('previoustrack', () => prev());
     navigator.mediaSession.setActionHandler('seekto', (details) => {
@@ -312,43 +318,50 @@ export function YouTubePlayer() {
     }
   }, [isPlaying]);
 
-  // 8. PWA / Mobile Lock Screen Watcher: Stop playback when phone screen is locked
+  // 8. Visibility watcher: Re-assert playback on wake/unlock
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const handleLockOrHide = () => {
-      if (document.hidden || document.visibilityState === 'hidden') {
-        if (isPWAOrMobile()) {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && isPlayingRef.current) {
+        if (playerRef.current) {
           try {
-            playerRef.current?.pauseVideo();
-          } catch (e) {
-            console.error(e);
-          }
-          _setIsPlaying(false);
-          pause();
-          if ('mediaSession' in navigator) {
-            navigator.mediaSession.playbackState = 'paused';
+            const state = playerRef.current.getPlayerState();
+            if (state !== window.YT.PlayerState.PLAYING && state !== window.YT.PlayerState.BUFFERING) {
+              playerRef.current.playVideo();
+            }
+          } catch {
+            // Ignore
           }
         }
+        audioAnchorRef.current?.play().catch(() => {});
       }
     };
 
-    document.addEventListener('visibilitychange', handleLockOrHide);
-    window.addEventListener('pagehide', handleLockOrHide);
-
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
-      document.removeEventListener('visibilitychange', handleLockOrHide);
-      window.removeEventListener('pagehide', handleLockOrHide);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [pause, _setIsPlaying]);
+  }, []);
 
   return (
-    <div
-      id="loop-yt-holder"
-      className="fixed -left-[9999px] -top-[9999px] w-1 h-1 opacity-0 pointer-events-none overflow-hidden"
-      aria-hidden="true"
-    >
-      <div id="loop-yt-iframe" />
-    </div>
+    <>
+      {/* Background Audio Anchor to maintain PWA/Mobile OS audio session during lock screen */}
+      <audio
+        ref={audioAnchorRef}
+        src="/silence.wav"
+        loop
+        preload="auto"
+        className="hidden"
+        aria-hidden="true"
+      />
+      <div
+        id="loop-yt-holder"
+        className="fixed bottom-0 right-0 w-8 h-8 opacity-[0.01] pointer-events-none overflow-hidden z-[-1]"
+        aria-hidden="true"
+      >
+        <div id="loop-yt-iframe" />
+      </div>
+    </>
   );
 }
