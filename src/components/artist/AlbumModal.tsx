@@ -27,6 +27,14 @@ export function AlbumModal({ albumId, initialTitle, initialThumbnail, onClose }:
   const { playSong, toggleShuffle, isShuffle } = usePlayer();
   const [loading, setLoading] = useState(true);
   const [album, setAlbum] = useState<AlbumData | null>(null);
+  const [isClosing, setIsClosing] = useState(false);
+
+  const handleClose = () => {
+    setIsClosing(true);
+    setTimeout(() => {
+      onClose();
+    }, 220);
+  };
 
   useEffect(() => {
     if (!albumId) return;
@@ -53,7 +61,7 @@ export function AlbumModal({ albumId, initialTitle, initialThumbnail, onClose }:
     loadAlbum();
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') handleClose();
     };
     window.addEventListener('keydown', handleKeyDown);
 
@@ -61,7 +69,7 @@ export function AlbumModal({ albumId, initialTitle, initialThumbnail, onClose }:
       mounted = false;
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [albumId, onClose]);
+  }, [albumId]);
 
   if (!albumId) return null;
 
@@ -82,15 +90,23 @@ export function AlbumModal({ albumId, initialTitle, initialThumbnail, onClose }:
   const displayThumbnail = album?.thumbnail || initialThumbnail;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 select-none animate-fade-in">
+    <div
+      className={`fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 select-none ${
+        isClosing ? 'animate-fade-out' : 'animate-fade-in'
+      }`}
+    >
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/80 backdrop-blur-xl transition-opacity"
-        onClick={onClose}
+        onClick={handleClose}
       />
 
       {/* Modal Dialog */}
-      <div className="album-modal relative w-full max-w-2xl max-h-[85vh] flex flex-col bg-[#0d111a] border border-white/[0.1] rounded-3xl shadow-2xl shadow-black/80 overflow-hidden z-10">
+      <div
+        className={`album-modal relative w-full max-w-2xl max-h-[85vh] flex flex-col bg-[#0d111a] border border-white/[0.1] rounded-3xl shadow-2xl shadow-black/80 overflow-hidden z-10 ${
+          isClosing ? 'animate-scale-out' : 'animate-scale-in'
+        }`}
+      >
         {/* Header bar */}
         <div className="flex items-center justify-between p-5 border-b border-white/[0.08] bg-white/[0.02]">
           <span className="text-xs font-bold uppercase tracking-widest text-emerald-400 flex items-center gap-1.5">
@@ -98,8 +114,8 @@ export function AlbumModal({ albumId, initialTitle, initialThumbnail, onClose }:
           </span>
           <button
             type="button"
-            onClick={onClose}
-            className="p-1.5 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+            onClick={handleClose}
+            className="p-1.5 rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-all duration-200 active:scale-90"
           >
             <X className="w-5 h-5" />
           </button>

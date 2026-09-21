@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import {
@@ -46,7 +46,29 @@ export function FullScreenNowPlaying() {
   } = usePlayer();
   const { openAddToPlaylistModal } = usePlaylist();
 
-  if (!isFullScreenPlayerOpen || !currentSong) return null;
+  const [shouldRender, setShouldRender] = useState(isFullScreenPlayerOpen);
+  const [isClosing, setIsClosing] = useState(false);
+
+  useEffect(() => {
+    if (isFullScreenPlayerOpen) {
+      setShouldRender(true);
+      setIsClosing(false);
+    } else if (shouldRender) {
+      setIsClosing(true);
+      const timer = setTimeout(() => {
+        setShouldRender(false);
+        setIsClosing(false);
+      }, 260);
+      return () => clearTimeout(timer);
+    }
+  }, [isFullScreenPlayerOpen, shouldRender]);
+
+  if (!shouldRender || !currentSong) return null;
+
+  const handleClose = () => {
+    setIsClosing(true);
+    closeFullScreen();
+  };
 
   const isLiked = isFavorite(currentSong.videoId);
 
@@ -56,7 +78,11 @@ export function FullScreenNowPlaying() {
     : null;
 
   return (
-    <div className="fullscreen-player-modal fixed inset-0 z-50 bg-[#07080C]/95 backdrop-blur-3xl flex flex-col justify-between p-6 sm:p-10 animate-in slide-in-from-bottom duration-300 overflow-y-auto">
+    <div
+      className={`fullscreen-player-modal fixed inset-0 z-50 bg-[#07080C]/95 backdrop-blur-3xl flex flex-col justify-between p-6 sm:p-10 overflow-y-auto ${
+        isClosing ? 'animate-modal-out' : 'animate-modal-in'
+      }`}
+    >
       {/* Ambient Gradient Backdrop */}
       <div
         className="fullscreen-ambient-bg absolute inset-0 opacity-25 pointer-events-none blur-[100px] scale-125 transition-all duration-700"
@@ -73,8 +99,8 @@ export function FullScreenNowPlaying() {
       <div className="relative flex items-center justify-between z-10 w-full max-w-xl mx-auto">
         <button
           type="button"
-          onClick={closeFullScreen}
-          className="fullscreen-minimize-btn w-10 h-10 rounded-2xl bg-white/[0.05] border border-white/[0.08] hover:bg-white/[0.1] text-slate-300 hover:text-white flex items-center justify-center transition-all active:scale-95"
+          onClick={handleClose}
+          className="fullscreen-minimize-btn w-10 h-10 rounded-2xl bg-white/[0.05] border border-white/[0.08] hover:bg-white/[0.1] text-slate-300 hover:text-white flex items-center justify-center transition-all duration-200 active:scale-90"
           title="Minimize player"
         >
           <ChevronDown className="w-5 h-5" />
@@ -93,13 +119,19 @@ export function FullScreenNowPlaying() {
 
       {/* Center: Large Artwork & Song Info */}
       <div className="relative flex flex-col items-center my-auto py-6 z-10 w-full max-w-sm mx-auto">
-        <div className="relative w-64 h-64 sm:w-80 sm:h-80 rounded-3xl overflow-hidden shadow-2xl shadow-emerald-500/10 border border-white/[0.1] mb-8 group">
+        <div
+          className={`relative w-64 h-64 sm:w-80 sm:h-80 rounded-3xl overflow-hidden shadow-2xl border border-white/[0.1] mb-8 group transition-all duration-500 ease-out ${
+            isPlaying
+              ? 'scale-100 shadow-emerald-500/20'
+              : 'scale-[0.95] opacity-90 shadow-black/60'
+          }`}
+        >
           <Image
             src={currentSong.thumbnail}
             alt={currentSong.title}
             fill
             sizes="(max-width: 640px) 256px, 320px"
-            className="object-cover"
+            className="object-cover transition-transform duration-700 ease-out group-hover:scale-105"
             priority
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
@@ -112,7 +144,7 @@ export function FullScreenNowPlaying() {
             </h2>
             <p
               onClick={() => {
-                closeFullScreen();
+                handleClose();
                 const target = currentSong.artists?.[0]?.browseId || encodeURIComponent(currentSong.artist);
                 router.push(`/artist/${target}`);
               }}

@@ -58,38 +58,38 @@ export function BottomPlayerBar() {
   return (
     <>
       {/* ---------------- MOBILE FLOATING MINI PLAYER (Screen < md) ---------------- */}
-      <div className="md:hidden fixed bottom-14 left-2.5 right-2.5 z-30 mb-1">
+      <div className="md:hidden fixed bottom-14 left-2.5 right-2.5 z-30 mb-1 animate-mobile-mini-in">
         <div
           onClick={openFullScreen}
-          className="mobile-player-bar bg-[#0E111C]/90 border border-white/[0.1] backdrop-blur-2xl rounded-2xl shadow-[0_12px_30px_rgba(0,0,0,0.8)] p-2.5 flex items-center justify-between gap-3 cursor-pointer relative overflow-hidden active:scale-[0.99] transition-transform"
+          className="mobile-player-bar bg-[#0E111C]/90 border border-white/[0.1] backdrop-blur-2xl rounded-2xl shadow-[0_12px_30px_rgba(0,0,0,0.8)] p-2.5 flex items-center justify-between gap-3 cursor-pointer relative overflow-hidden active:scale-[0.98] transition-all duration-200"
         >
           {/* Progress bar line at top */}
           <div className="absolute top-0 left-0 right-0 h-1 bg-white/[0.08]">
             <div
-              className="h-full bg-emerald-400 transition-all duration-200 shadow-[0_0_8px_rgba(16,185,129,0.8)]"
+              className="h-full bg-emerald-400 transition-all duration-150 ease-out shadow-[0_0_8px_rgba(16,185,129,0.8)]"
               style={{ width: `${progressPercent}%` }}
             />
           </div>
 
           <div className="flex items-center gap-3 overflow-hidden">
-            <div className="relative w-11 h-11 rounded-xl overflow-hidden bg-neutral-900 shrink-0 border border-white/[0.08]">
+            <div className="relative w-11 h-11 rounded-xl overflow-hidden bg-neutral-900 shrink-0 border border-white/[0.08] shadow-md group">
               <Image
                 src={currentSong.thumbnail}
                 alt={currentSong.title}
                 fill
                 sizes="44px"
-                className="object-cover"
+                className="object-cover transition-transform duration-300 group-hover:scale-105"
               />
             </div>
             <div className="flex flex-col overflow-hidden">
-              <span className="text-sm font-bold text-white truncate">{currentSong.title}</span>
+              <span className="text-sm font-bold text-white truncate transition-colors duration-200">{currentSong.title}</span>
               <span
                 onClick={(e) => {
                   e.stopPropagation();
                   const target = currentSong.artists?.[0]?.browseId || encodeURIComponent(currentSong.artist);
                   router.push(`/artist/${target}`);
                 }}
-                className="text-xs text-zinc-400 truncate hover:text-emerald-400 hover:underline cursor-pointer transition-colors"
+                className="text-xs text-zinc-400 truncate hover:text-emerald-400 hover:underline cursor-pointer transition-colors duration-200"
               >
                 {currentSong.artist}
               </span>
@@ -100,15 +100,15 @@ export function BottomPlayerBar() {
             <button
               type="button"
               onClick={() => toggleFavorite(currentSong)}
-              className="p-2 text-zinc-400 hover:text-white transition"
+              className="p-2 text-zinc-400 hover:text-white transition-all duration-200 active:scale-90"
               title="Favorite"
             >
-              <Heart className={`w-4 h-4 ${isLiked ? 'text-emerald-400 fill-emerald-400' : ''}`} />
+              <Heart className={`w-4 h-4 transition-colors duration-200 ${isLiked ? 'text-emerald-400 fill-emerald-400' : ''}`} />
             </button>
             <button
               type="button"
               onClick={togglePlay}
-              className="w-10 h-10 rounded-full bg-emerald-400 text-black flex items-center justify-center shadow-[0_0_12px_rgba(16,185,129,0.4)] active:scale-95 transition"
+              className="w-10 h-10 rounded-full bg-emerald-400 text-black flex items-center justify-center shadow-[0_0_14px_rgba(16,185,129,0.45)] hover:scale-105 active:scale-90 transition-all duration-200"
               title={isPlaying ? 'Pause' : 'Play'}
             >
               {isPlaying ? <Pause className="w-4 h-4 fill-black" /> : <Play className="w-4 h-4 fill-black translate-x-0.5" />}
@@ -116,7 +116,7 @@ export function BottomPlayerBar() {
             <button
               type="button"
               onClick={next}
-              className="p-2 text-zinc-400 hover:text-white active:scale-95 transition"
+              className="p-2 text-zinc-400 hover:text-white active:scale-90 transition-all duration-200"
               title="Next"
             >
               <SkipForward className="w-4 h-4" />
@@ -126,7 +126,7 @@ export function BottomPlayerBar() {
       </div>
 
       {/* ---------------- DESKTOP PLAYER DOCK BAR (Screen >= md) ---------------- */}
-      <div className="desktop-player-bar hidden md:flex fixed bottom-0 left-0 right-0 z-40 h-24 bg-[#090B12]/90 border-t border-white/[0.08] backdrop-blur-2xl px-6 items-center justify-between select-none shadow-[0_-12px_32px_rgba(0,0,0,0.6)]">
+      <div className="desktop-player-bar hidden md:flex fixed bottom-0 left-0 right-0 z-40 h-24 bg-[#090B12]/90 border-t border-white/[0.08] backdrop-blur-2xl px-6 items-center justify-between select-none shadow-[0_-12px_32px_rgba(0,0,0,0.6)] animate-player-in">
         {/* Left: Song Meta */}
         <div className="flex items-center gap-4 w-1/4 min-w-0">
           <div

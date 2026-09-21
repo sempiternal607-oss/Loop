@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { X, ListMusic, Trash2, Radio } from 'lucide-react';
 import { usePlayer } from '@/context/PlayerContext';
@@ -17,12 +17,38 @@ export function QueueDrawer() {
     removeFromQueue,
   } = usePlayer();
 
-  if (!isQueueOpen) return null;
+  const [shouldRender, setShouldRender] = useState(isQueueOpen);
+  const [isClosing, setIsClosing] = useState(false);
+
+  useEffect(() => {
+    if (isQueueOpen) {
+      setShouldRender(true);
+      setIsClosing(false);
+    } else if (shouldRender) {
+      setIsClosing(true);
+      const timer = setTimeout(() => {
+        setShouldRender(false);
+        setIsClosing(false);
+      }, 260);
+      return () => clearTimeout(timer);
+    }
+  }, [isQueueOpen, shouldRender]);
+
+  if (!shouldRender) return null;
+
+  const handleClose = () => {
+    setIsClosing(true);
+    closeQueue();
+  };
 
   const upcomingQueue = queue.slice(currentIndex + 1);
 
   return (
-    <div className="queue-drawer fixed inset-y-0 right-0 z-50 w-full max-w-md bg-[#07080C]/95 border-l border-white/[0.08] backdrop-blur-2xl shadow-2xl flex flex-col p-6 animate-in slide-in-from-right duration-200">
+    <div
+      className={`queue-drawer fixed inset-y-0 right-0 z-50 w-full max-w-md bg-[#07080C]/95 border-l border-white/[0.08] backdrop-blur-2xl shadow-2xl flex flex-col p-6 ${
+        isClosing ? 'animate-drawer-out' : 'animate-drawer-in'
+      }`}
+    >
       {/* Header */}
       <div className="flex items-center justify-between pb-5 border-b border-white/[0.08]">
         <div className="flex items-center gap-2.5">
@@ -36,8 +62,8 @@ export function QueueDrawer() {
         </div>
         <button
           type="button"
-          onClick={closeQueue}
-          className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.08] transition-colors"
+          onClick={handleClose}
+          className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.08] transition-all duration-200 active:scale-90"
           title="Close queue"
         >
           <X className="w-5 h-5" />

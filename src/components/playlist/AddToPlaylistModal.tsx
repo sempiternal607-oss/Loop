@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { X, Plus, Check, ListMusic, Music } from 'lucide-react';
 import { usePlaylist } from '@/context/PlaylistContext';
@@ -19,8 +19,29 @@ export function AddToPlaylistModal() {
 
   const [newTitle, setNewTitle] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [shouldRender, setShouldRender] = useState(isAddToPlaylistOpen);
+  const [isClosing, setIsClosing] = useState(false);
 
-  if (!isAddToPlaylistOpen || !songToAddToPlaylist) return null;
+  useEffect(() => {
+    if (isAddToPlaylistOpen) {
+      setShouldRender(true);
+      setIsClosing(false);
+    } else if (shouldRender) {
+      setIsClosing(true);
+      const timer = setTimeout(() => {
+        setShouldRender(false);
+        setIsClosing(false);
+      }, 220);
+      return () => clearTimeout(timer);
+    }
+  }, [isAddToPlaylistOpen, shouldRender]);
+
+  if (!shouldRender || !songToAddToPlaylist) return null;
+
+  const handleClose = () => {
+    setIsClosing(true);
+    closeAddToPlaylistModal();
+  };
 
   const handleCreateNew = (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,7 +50,7 @@ export function AddToPlaylistModal() {
       addSongToPlaylist(created.id, songToAddToPlaylist);
       setNewTitle('');
       setIsCreating(false);
-      closeAddToPlaylistModal();
+      handleClose();
     }
   };
 
@@ -43,11 +64,15 @@ export function AddToPlaylistModal() {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-200"
-      onClick={closeAddToPlaylistModal}
+      className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md ${
+        isClosing ? 'animate-fade-out' : 'animate-fade-in'
+      }`}
+      onClick={handleClose}
     >
       <div
-        className="playlist-modal glass-panel w-full max-w-md rounded-3xl p-6 border border-white/[0.1] shadow-2xl flex flex-col gap-5 animate-in zoom-in-95 duration-200 bg-[#0c0f18]/95"
+        className={`playlist-modal glass-panel w-full max-w-md rounded-3xl p-6 border border-white/[0.1] shadow-2xl flex flex-col gap-5 bg-[#0c0f18]/95 ${
+          isClosing ? 'animate-scale-out' : 'animate-scale-in'
+        }`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -60,8 +85,8 @@ export function AddToPlaylistModal() {
           </div>
           <button
             type="button"
-            onClick={closeAddToPlaylistModal}
-            className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.08] transition-colors"
+            onClick={handleClose}
+            className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.08] transition-all duration-200 active:scale-90"
           >
             <X className="w-5 h-5" />
           </button>

@@ -252,7 +252,7 @@ export default function PlaylistDetailPage() {
       {isEditing && (
         <form
           onSubmit={handleSaveEdit}
-          className="glass-panel rounded-3xl p-6 border border-emerald-500/30 max-w-lg flex flex-col gap-4 animate-in slide-in-from-top-4 duration-200"
+          className="glass-panel rounded-3xl p-6 border border-emerald-500/30 max-w-lg flex flex-col gap-4 animate-scale-in"
         >
           <div className="flex items-center justify-between">
             <h3 className="text-base font-bold text-white">Edit Playlist Details</h3>

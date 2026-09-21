@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { X, Mic2, Music2 } from 'lucide-react';
 import { usePlayer } from '@/context/PlayerContext';
 
@@ -15,6 +15,23 @@ export function SyncedLyricsDrawer() {
     seek,
   } = usePlayer();
 
+  const [shouldRender, setShouldRender] = useState(isLyricsOpen);
+  const [isClosing, setIsClosing] = useState(false);
+
+  useEffect(() => {
+    if (isLyricsOpen) {
+      setShouldRender(true);
+      setIsClosing(false);
+    } else if (shouldRender) {
+      setIsClosing(true);
+      const timer = setTimeout(() => {
+        setShouldRender(false);
+        setIsClosing(false);
+      }, 260);
+      return () => clearTimeout(timer);
+    }
+  }, [isLyricsOpen, shouldRender]);
+
   const activeLineRef = useRef<HTMLButtonElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -28,7 +45,12 @@ export function SyncedLyricsDrawer() {
     }
   }, [progress, isLyricsOpen]);
 
-  if (!isLyricsOpen || !currentSong) return null;
+  if (!shouldRender || !currentSong) return null;
+
+  const handleClose = () => {
+    setIsClosing(true);
+    closeLyrics();
+  };
 
   // Determine current active lyric line index
   let activeIndex = -1;
@@ -43,7 +65,11 @@ export function SyncedLyricsDrawer() {
   }
 
   return (
-    <div className="lyrics-drawer fixed inset-0 z-50 bg-[#07080C]/95 backdrop-blur-3xl flex flex-col p-6 sm:p-10 animate-in fade-in zoom-in-95 duration-200">
+    <div
+      className={`lyrics-drawer fixed inset-0 z-50 bg-[#07080C]/95 backdrop-blur-3xl flex flex-col p-6 sm:p-10 ${
+        isClosing ? 'animate-modal-out' : 'animate-modal-in'
+      }`}
+    >
       {/* Ambient background glow */}
       <div
         className="absolute inset-0 opacity-20 pointer-events-none blur-[100px] scale-125 transition-all duration-700"
@@ -72,8 +98,8 @@ export function SyncedLyricsDrawer() {
 
         <button
           type="button"
-          onClick={closeLyrics}
-          className="w-10 h-10 rounded-2xl bg-white/[0.05] border border-white/[0.08] text-slate-400 hover:text-white hover:bg-white/[0.1] flex items-center justify-center transition-all active:scale-95"
+          onClick={handleClose}
+          className="w-10 h-10 rounded-2xl bg-white/[0.05] border border-white/[0.08] text-slate-400 hover:text-white hover:bg-white/[0.1] flex items-center justify-center transition-all duration-200 active:scale-90"
           title="Close lyrics"
         >
           <X className="w-5 h-5" />

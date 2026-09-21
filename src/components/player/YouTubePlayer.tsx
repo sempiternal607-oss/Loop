@@ -66,6 +66,8 @@ export function YouTubePlayer() {
     next,
     prev,
     togglePlay,
+    pause,
+    resume,
   } = usePlayer();
 
   const { showToast } = useToast();
@@ -247,7 +249,22 @@ export function YouTubePlayer() {
     return () => clearInterval(interval);
   }, [isPlaying, sponsorBlockEnabled, activeSegments, _setProgress, _setDuration, showToast]);
 
-  // 7. MediaSession API integration for Lock Screen & System notifications
+  // Helper to detect PWA mode or mobile device
+  const isPWAOrMobile = () => {
+    if (typeof window === 'undefined') return false;
+    const isStandalone =
+      window.matchMedia('(display-mode: standalone)').matches ||
+      window.matchMedia('(display-mode: fullscreen)').matches ||
+      window.matchMedia('(display-mode: minimal-ui)').matches ||
+      Boolean((window.navigator as unknown as { standalone?: boolean }).standalone) ||
+      document.referrer.includes('android-app://');
+    const isMobile =
+      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+      (navigator.maxTouchPoints > 1 && /Macintosh/i.test(navigator.userAgent));
+    return isStandalone || isMobile;
+  };
+
+  // 7. MediaSession API integration for System Notifications & Controls
   useEffect(() => {
     if (typeof window === 'undefined' || !('mediaSession' in navigator) || !currentSong) return;
 
@@ -262,8 +279,14 @@ export function YouTubePlayer() {
       ],
     });
 
-    navigator.mediaSession.setActionHandler('play', () => togglePlay());
-    navigator.mediaSession.setActionHandler('pause', () => togglePlay());
+    navigator.mediaSession.setActionHandler('play', () => {
+      // Disallow background playback if phone screen is locked or hidden
+      if (document.visibilityState === 'hidden' && isPWAOrMobile()) {
+        return;
+      }
+      resume();
+    });
+    navigator.mediaSession.setActionHandler('pause', () => pause());
     navigator.mediaSession.setActionHandler('nexttrack', () => next());
     navigator.mediaSession.setActionHandler('previoustrack', () => prev());
     navigator.mediaSession.setActionHandler('seekto', (details) => {
@@ -280,7 +303,44 @@ export function YouTubePlayer() {
       navigator.mediaSession.setActionHandler('previoustrack', null);
       navigator.mediaSession.setActionHandler('seekto', null);
     };
-  }, [currentSong, togglePlay, next, prev, _setProgress]);
+  }, [currentSong, resume, pause, next, prev, _setProgress]);
+
+  // Sync playbackState with navigator.mediaSession
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+    }
+  }, [isPlaying]);
+
+  // 8. PWA / Mobile Lock Screen Watcher: Stop playback when phone screen is locked
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleLockOrHide = () => {
+      if (document.hidden || document.visibilityState === 'hidden') {
+        if (isPWAOrMobile()) {
+          try {
+            playerRef.current?.pauseVideo();
+          } catch (e) {
+            console.error(e);
+          }
+          _setIsPlaying(false);
+          pause();
+          if ('mediaSession' in navigator) {
+            navigator.mediaSession.playbackState = 'paused';
+          }
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleLockOrHide);
+    window.addEventListener('pagehide', handleLockOrHide);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleLockOrHide);
+      window.removeEventListener('pagehide', handleLockOrHide);
+    };
+  }, [pause, _setIsPlaying]);
 
   return (
     <div

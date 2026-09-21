@@ -102,7 +102,7 @@ export function Header() {
 
         {/* Suggestion Dropdown */}
         {isOpen && suggestions.length > 0 && (
-          <div className="absolute top-full left-0 right-0 mt-2 bg-[#10131E]/95 backdrop-blur-2xl border border-white/[0.1] rounded-2xl shadow-2xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-1 duration-150 p-1.5">
+          <div className="absolute top-full left-0 right-0 mt-2 bg-[#10131E]/95 backdrop-blur-2xl border border-white/[0.1] rounded-2xl shadow-2xl overflow-hidden z-50 animate-scale-in p-1.5">
             {suggestions.map((item, idx) => (
               <button
                 key={idx}
