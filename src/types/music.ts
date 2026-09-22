@@ -43,6 +43,7 @@ export interface Song {
   duration?: number; // in seconds
   durationText?: string;
   _userAdded?: boolean;
+  isVideo?: boolean;
 }
 
 export interface SponsorSegment {

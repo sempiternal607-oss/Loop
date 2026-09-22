@@ -205,6 +205,45 @@ export function isNonMusicContent(title: string, subtitle = '', rawItem?: unknow
   return false;
 }
 
+// Clean up video title and extract real artist from title delimiters (e.g. "Artist - Title", "Show - Artist - Title")
+export function cleanVideoTitleAndArtist(rawTitle: string, fallbackArtist?: string): { title: string; artist: string } {
+  let cleanedTitle = rawTitle.trim();
+  let extractedArtist = '';
+
+  const cleanSuffix = (t: string) =>
+    t
+      .replace(/\s*[\(\[](?:official\s*(?:music\s*)?(?:video|audio|lyric\s*video|lyric|clip)?|video\s*klip|video\s*lirik|lirik\s*(?:video)?|official\s*lyric\s*video|audio|lyrics?|mv)[\)\]]/gi, '')
+      .replace(/\s*\*+\s*$/g, '')
+      .replace(/\s*[-–—]\s*$/g, '')
+      .trim();
+
+  if (cleanedTitle.includes(' - ') || cleanedTitle.includes(' – ') || cleanedTitle.includes(' — ')) {
+    const parts = cleanedTitle.split(/\s+[-–—]\s+/);
+    if (parts.length === 2) {
+      extractedArtist = parts[0].trim();
+      cleanedTitle = cleanSuffix(parts[1].trim());
+    } else if (parts.length >= 3) {
+      extractedArtist = parts[1].trim();
+      cleanedTitle = cleanSuffix(parts.slice(2).join(' - '));
+    }
+  } else if (cleanedTitle.includes(' | ')) {
+    const parts = cleanedTitle.split(/\s+\|\s+/);
+    if (parts.length === 2) {
+      extractedArtist = parts[1].trim();
+      cleanedTitle = cleanSuffix(parts[0].trim());
+    }
+  }
+
+  if (!extractedArtist && fallbackArtist) {
+    extractedArtist = fallbackArtist.replace(/\s*-\s*topic$/i, '').trim();
+  }
+
+  return {
+    title: cleanedTitle || rawTitle,
+    artist: extractedArtist || fallbackArtist || 'Unknown Artist',
+  };
+}
+
 // Convert InnerTube item renderer into our standardized Song interface
 export function parseRendererToSong(item: unknown): Song | null {
   if (!item || typeof item !== 'object') return null;
@@ -310,9 +349,8 @@ export function parseRendererToSong(item: unknown): Song | null {
 
   const thumbnail = extractThumbnail(renderer.thumbnail || renderer.thumbnailRenderer || renderer);
 
-  // 5. If still no artists found, extract from play button label or title delimiters
+  // 5. Check play button accessibility label fallback if still no artist
   if (artists.length === 0) {
-    // 5a. Check play button accessibility label: "Putar Title - Artist" or "Play Title - Artist"
     const playBtn = (renderer.overlay as Record<string, unknown> | undefined)?.musicItemThumbnailOverlayRenderer as Record<string, unknown> | undefined;
     const playContent = (playBtn?.content as Record<string, unknown> | undefined)?.musicPlayButtonRenderer as Record<string, unknown> | undefined;
     const a11yPlay = playContent?.accessibilityPlayData as { accessibilityData?: { label?: string } } | undefined;
@@ -330,32 +368,34 @@ export function parseRendererToSong(item: unknown): Song | null {
     }
   }
 
-  // 5b. Check title delimiter: "Artist - Title" or "Title | Artist"
-  if (artists.length === 0 && title) {
-    if (title.includes(' - ')) {
-      const parts = title.split(' - ');
-      if (parts.length >= 2 && parts[0].trim() && parts[1].trim()) {
-        artists.push({ name: parts[0].trim() });
-      }
-    } else if (title.includes(' | ')) {
-      const parts = title.split(' | ');
-      if (parts.length >= 2 && parts[1].trim()) {
-        artists.push({ name: parts[1].trim() });
-      }
+  const isVideo = rawSub.toLowerCase().includes('video');
+  let finalTitle = title;
+  let finalArtist = artists.map((a) => a.name).join(', ');
+
+  // 6. Clean title and extract real artist for music videos, community uploads, or delimited titles
+  if (isVideo || title.includes(' - ') || title.includes(' – ') || title.includes(' — ') || title.includes(' | ')) {
+    const cleaned = cleanVideoTitleAndArtist(title, finalArtist);
+    if (cleaned.artist && cleaned.artist !== 'Unknown Artist') {
+      finalArtist = cleaned.artist;
+      artists.splice(0, artists.length, { name: cleaned.artist });
+    }
+    if (cleaned.title) {
+      finalTitle = cleaned.title;
     }
   }
 
-  const artistName = artists.map((a) => a.name).join(', ') || 'Unknown Artist';
+  finalArtist = finalArtist || 'Unknown Artist';
 
   return {
     videoId,
-    title: title || 'Unknown Title',
-    artist: artistName,
+    title: finalTitle || 'Unknown Title',
+    artist: finalArtist,
     artists,
     album: album || undefined,
     thumbnail: thumbnail || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
     duration,
     durationText: durationText || formatDuration(duration),
+    isVideo,
   };
 }
 

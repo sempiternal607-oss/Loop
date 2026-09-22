@@ -17,7 +17,7 @@ function SearchContent() {
   const [results, setResults] = useState<Song[]>([]);
   const [matchedArtist, setMatchedArtist] = useState<ArtistSummary | null>(null);
   const [loading, setLoading] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<'all' | 'songs'>('songs');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'songs' | 'videos'>('all');
 
   useEffect(() => {
     setQuery(initialQuery);
@@ -32,7 +32,7 @@ function SearchContent() {
   async function performSearch(searchTerm: string, filter: string) {
     setLoading(true);
     try {
-      const filterParam = filter === 'songs' ? '&filter=songs' : '';
+      const filterParam = filter ? `&filter=${encodeURIComponent(filter)}` : '';
       const res = await fetch(`/api/search?q=${encodeURIComponent(searchTerm)}${filterParam}`);
       if (res.ok) {
         const data = await res.json();
@@ -85,6 +85,17 @@ function SearchContent() {
         <div className="flex items-center p-1 rounded-2xl bg-white/[0.04] border border-white/[0.08] w-fit">
           <button
             type="button"
+            onClick={() => setActiveFilter('all')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+              activeFilter === 'all'
+                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-sm'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            All Results
+          </button>
+          <button
+            type="button"
             onClick={() => setActiveFilter('songs')}
             className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
               activeFilter === 'songs'
@@ -96,14 +107,14 @@ function SearchContent() {
           </button>
           <button
             type="button"
-            onClick={() => setActiveFilter('all')}
+            onClick={() => setActiveFilter('videos')}
             className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-              activeFilter === 'all'
+              activeFilter === 'videos'
                 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-sm'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            All Results
+            Videos & Covers
           </button>
         </div>
       </div>
