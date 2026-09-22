@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { Home, Search, Library, Heart, Disc3, ListMusic, Plus } from 'lucide-react';
 import { usePlayer } from '@/context/PlayerContext';
@@ -32,8 +33,15 @@ export function Sidebar() {
       <div className="flex flex-col gap-6">
         {/* Modern Logo Branding */}
         <Link href="/" className="flex items-center gap-3 px-1.5 group">
-          <div className="relative w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-500 via-teal-400 to-indigo-600 flex items-center justify-center shadow-[0_0_20px_-3px_rgba(16,185,129,0.4)] group-hover:scale-105 transition-transform duration-300">
-            <Disc3 className="w-5 h-5 text-black animate-spin-slow" />
+          <div className="relative w-9 h-9 rounded-xl overflow-hidden shadow-[0_0_20px_-3px_rgba(16,185,129,0.4)] group-hover:scale-105 transition-transform duration-300 shrink-0">
+            <Image
+              src="/icon.png"
+              alt="Loop Logo"
+              width={36}
+              height={36}
+              className="w-full h-full object-cover"
+              priority
+            />
           </div>
           <div className="flex flex-col">
             <div className="flex items-center gap-1.5">

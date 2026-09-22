@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Search, X, Disc3, Sparkles } from 'lucide-react';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
@@ -59,8 +60,15 @@ export function Header() {
     <header className="sticky top-0 z-30 flex items-center justify-between gap-4 px-4 md:px-8 py-3 bg-[#090B12]/80 backdrop-blur-2xl border-b border-white/[0.06]">
       {/* Mobile Logo Brand */}
       <Link href="/" className="md:hidden flex items-center gap-2.5 shrink-0">
-        <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-500 to-indigo-600 flex items-center justify-center shadow-[0_0_15px_-3px_rgba(16,185,129,0.3)]">
-          <Disc3 className="w-4 h-4 text-black animate-spin-slow" />
+        <div className="w-8 h-8 rounded-xl overflow-hidden shadow-[0_0_15px_-3px_rgba(16,185,129,0.3)] shrink-0">
+          <Image
+            src="/icon.png"
+            alt="Loop Logo"
+            width={32}
+            height={32}
+            className="w-full h-full object-cover"
+            priority
+          />
         </div>
         <span className="font-extrabold text-white text-base tracking-tight">Loop</span>
       </Link>
