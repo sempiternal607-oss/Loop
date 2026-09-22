@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { X, Mic2, Music2, Timer, RotateCcw, Target } from 'lucide-react';
+import { X, Mic2, Music2, Timer, RotateCcw } from 'lucide-react';
 import { usePlayer } from '@/context/PlayerContext';
 import { useToast } from '@/components/ui/Toast';
 
@@ -15,7 +15,6 @@ export function SyncedLyricsDrawer() {
     progress,
     seek,
     lyricsOffset,
-    setLyricsOffset,
     adjustLyricsOffset,
     resetLyricsOffset,
   } = usePlayer();
@@ -39,7 +38,7 @@ export function SyncedLyricsDrawer() {
     }
   }, [isLyricsOpen, shouldRender]);
 
-  const activeLineRef = useRef<HTMLDivElement | null>(null);
+  const activeLineRef = useRef<HTMLButtonElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   // Auto-scroll to active lyric with offset considered
@@ -71,17 +70,6 @@ export function SyncedLyricsDrawer() {
       }
     }
   }
-
-  // 1-Click Smart Sync: Automatically calibrate offset to match this line with current playback
-  const handleSyncToLine = (e: React.MouseEvent, lineTime: number, lineText: string) => {
-    e.stopPropagation();
-    const calculatedOffset = Math.round((lineTime - progress) * 10) / 10;
-    setLyricsOffset(calculatedOffset);
-    const displayText = lineText && lineText !== '♪' ? `"${lineText.slice(0, 20)}…"` : 'baris ini';
-    showToast(
-      `📍 Lirik disinkronkan ke ${displayText} (${calculatedOffset > 0 ? `+${calculatedOffset}s` : `${calculatedOffset}s`})`
-    );
-  };
 
   return (
     <div
@@ -284,65 +272,35 @@ export function SyncedLyricsDrawer() {
             const isPast = idx < activeIndex;
 
             return (
-              <div
+              <button
                 key={idx}
                 ref={isActive ? activeLineRef : null}
-                className="group relative flex items-center justify-between gap-3 w-full"
+                type="button"
+                onClick={() => {
+                  if (lyrics.synced) {
+                    seek(Math.max(0, line.time - lyricsOffset));
+                  }
+                }}
+                className={`text-left transition-all duration-300 rounded-2xl px-5 py-3 hover:bg-white/[0.05] cursor-pointer ${
+                  isActive
+                    ? 'text-white text-2xl sm:text-3xl font-black scale-[1.02] origin-left tracking-tight bg-white/[0.06] border border-white/[0.1] shadow-xl shadow-emerald-500/5'
+                    : isPast
+                    ? 'text-slate-500 text-lg sm:text-xl font-bold'
+                    : 'text-slate-500 text-lg sm:text-xl font-bold hover:text-slate-300'
+                }`}
               >
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (lyrics.synced) {
-                      seek(Math.max(0, line.time - lyricsOffset));
-                    }
-                  }}
-                  className={`flex-1 text-left transition-all duration-300 rounded-2xl px-5 py-3 hover:bg-white/[0.05] cursor-pointer ${
-                    isActive
-                      ? 'text-white text-2xl sm:text-3xl font-black scale-[1.02] origin-left tracking-tight bg-white/[0.06] border border-white/[0.1] shadow-xl shadow-emerald-500/5'
-                      : isPast
-                      ? 'text-slate-500 text-lg sm:text-xl font-bold'
-                      : 'text-slate-500 text-lg sm:text-xl font-bold hover:text-slate-300'
-                  }`}
-                >
-                  <span className={isActive ? 'lyric-active-text bg-gradient-to-r from-emerald-300 to-white bg-clip-text text-transparent' : ''}>
-                    {line.text || '♪'}
-                  </span>
-                </button>
-
-                {lyrics.synced && (
-                  <button
-                    type="button"
-                    onClick={(e) => handleSyncToLine(e, line.time, line.text)}
-                    className={`shrink-0 p-2 rounded-xl border flex items-center gap-1.5 transition-all active:scale-90 cursor-pointer ${
-                      isActive
-                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 opacity-90 hover:opacity-100 hover:bg-emerald-500/30'
-                        : 'opacity-40 hover:opacity-100 bg-white/[0.04] text-slate-400 hover:text-white border-white/[0.08] hover:bg-white/[0.1]'
-                    }`}
-                    title="Klik saat vokal menyanyikan baris ini untuk mencocokkan sinkronisasi seketika"
-                  >
-                    <Target className="w-3.5 h-3.5 text-emerald-400" />
-                    <span className="text-[11px] font-medium hidden md:inline">Sync Baris Ini</span>
-                  </button>
-                )}
-              </div>
+                <span className={isActive ? 'lyric-active-text bg-gradient-to-r from-emerald-300 to-white bg-clip-text text-transparent' : ''}>
+                  {line.text || '♪'}
+                </span>
+              </button>
             );
           })
         )}
       </div>
 
-      <div className="relative text-center text-xs text-slate-400 z-10 pt-4 flex flex-col sm:flex-row items-center justify-center gap-2">
-        <div className="flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/60" />
-          <span>Tap baris lirik untuk lompat audio</span>
-        </div>
-        {lyrics?.synced && (
-          <>
-            <span className="hidden sm:inline text-slate-600">•</span>
-            <span className="text-slate-400 text-[11px]">
-              Klik <Target className="w-3.5 h-3.5 inline text-emerald-400 mx-0.5" /> pada baris lirik untuk otomatis menyelaraskan dengan vokal
-            </span>
-          </>
-        )}
+      <div className="relative text-center text-xs text-slate-400 z-10 pt-4 flex items-center justify-center gap-2">
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/60" />
+        <span>Tap baris lirik untuk melompat audio</span>
       </div>
     </div>
   );
