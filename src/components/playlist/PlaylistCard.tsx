@@ -3,16 +3,18 @@
 import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Play, Music } from 'lucide-react';
+import { Play, Music, Share2 } from 'lucide-react';
 import { Playlist } from '@/types/music';
 import { usePlayer } from '@/context/PlayerContext';
+import { usePlaylist } from '@/context/PlaylistContext';
 
 interface PlaylistCardProps {
   playlist: Playlist;
 }
 
 export function PlaylistCard({ playlist }: PlaylistCardProps) {
-  const { playPlaylist, currentSong, isPlaying } = usePlayer();
+  const { playPlaylist } = usePlayer();
+  const { openShareModal } = usePlaylist();
 
   const handlePlayClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -63,6 +65,22 @@ export function PlaylistCard({ playlist }: PlaylistCardProps) {
 
         {/* Dark Vignette Overlay on Hover */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+
+        {/* Floating Quick Share Button */}
+        <div className="absolute top-2.5 right-2.5 -translate-y-1 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300 ease-out z-10">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              openShareModal(playlist);
+            }}
+            className="w-8 h-8 rounded-full bg-black/60 hover:bg-emerald-500 text-white hover:text-slate-950 backdrop-blur-md flex items-center justify-center border border-white/10 shadow-lg active:scale-90 transition-all cursor-pointer"
+            title={`Bagikan "${playlist.title}"`}
+          >
+            <Share2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
 
         {/* Floating Emerald Play Button */}
         {playlist.songs.length > 0 && (

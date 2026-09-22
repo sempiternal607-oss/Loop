@@ -14,6 +14,7 @@ import {
   Plus,
   ArrowLeft,
   Sparkles,
+  Share2,
 } from 'lucide-react';
 import { usePlaylist } from '@/context/PlaylistContext';
 import { usePlayer } from '@/context/PlayerContext';
@@ -25,7 +26,14 @@ export default function PlaylistDetailPage() {
   const router = useRouter();
   const playlistId = params?.id as string;
 
-  const { getPlaylist, deletePlaylist, updatePlaylist, removeSongFromPlaylist, addSongToPlaylist } = usePlaylist();
+  const {
+    getPlaylist,
+    deletePlaylist,
+    updatePlaylist,
+    removeSongFromPlaylist,
+    addSongToPlaylist,
+    openShareModal,
+  } = usePlaylist();
   const { playPlaylist, playSong, currentSong, isPlaying } = usePlayer();
 
   const playlist = getPlaylist(playlistId);
@@ -226,6 +234,16 @@ export default function PlaylistDetailPage() {
                 </button>
               </>
             )}
+
+            <button
+              type="button"
+              onClick={() => openShareModal(playlist)}
+              className="flex items-center gap-2 px-4 py-3 rounded-full bg-white/[0.04] hover:bg-emerald-500/20 text-slate-300 hover:text-emerald-300 border border-white/[0.08] hover:border-emerald-500/30 font-bold text-xs sm:text-sm active:scale-95 transition cursor-pointer"
+              title="Bagikan playlist via Tautan atau QR Code"
+            >
+              <Share2 className="w-4 h-4 text-emerald-400" />
+              <span>Bagikan</span>
+            </button>
 
             <button
               type="button"

@@ -14,6 +14,7 @@ import { FullScreenNowPlaying } from '@/components/player/FullScreenNowPlaying';
 import { SyncedLyricsDrawer } from '@/components/lyrics/SyncedLyricsDrawer';
 import { QueueDrawer } from '@/components/queue/QueueDrawer';
 import { AddToPlaylistModal } from '@/components/playlist/AddToPlaylistModal';
+import { SharePlaylistModal } from '@/components/playlist/SharePlaylistModal';
 import { PwaRegister } from '@/components/pwa/PwaRegister';
 
 const geistSans = Geist({
@@ -107,6 +108,7 @@ export default function RootLayout({
               <SyncedLyricsDrawer />
               <QueueDrawer />
               <AddToPlaylistModal />
+              <SharePlaylistModal />
             </PlaylistProvider>
           </PlayerProvider>
         </ToastProvider>

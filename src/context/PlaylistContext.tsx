@@ -13,12 +13,19 @@ interface PlaylistContextType {
   removeSongFromPlaylist: (playlistId: string, videoId: string) => void;
   isSongInPlaylist: (playlistId: string, videoId: string) => boolean;
   getPlaylist: (id: string) => Playlist | undefined;
+  importPlaylist: (data: { title: string; description?: string; songs: Song[] }) => Playlist;
 
   // Add to Playlist modal state
   isAddToPlaylistOpen: boolean;
   songToAddToPlaylist: Song | null;
   openAddToPlaylistModal: (song: Song) => void;
   closeAddToPlaylistModal: () => void;
+
+  // Share Playlist modal state
+  isShareModalOpen: boolean;
+  playlistToShare: Playlist | null;
+  openShareModal: (playlist: Playlist) => void;
+  closeShareModal: () => void;
 }
 
 const PlaylistContext = createContext<PlaylistContextType | undefined>(undefined);
@@ -33,6 +40,10 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
   // Modal State
   const [isAddToPlaylistOpen, setIsAddToPlaylistOpen] = useState(false);
   const [songToAddToPlaylist, setSongToAddToPlaylist] = useState<Song | null>(null);
+
+  // Share Modal State
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [playlistToShare, setPlaylistToShare] = useState<Playlist | null>(null);
 
   // Load playlists from localStorage on mount
   useEffect(() => {
@@ -195,6 +206,38 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
     setSongToAddToPlaylist(null);
   }, []);
 
+  const importPlaylist = useCallback(
+    (data: { title: string; description?: string; songs: Song[] }): Playlist => {
+      const trimmedTitle = data.title.trim() || 'Imported Playlist';
+      const newPlaylist: Playlist = {
+        id: `pl_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        title: trimmedTitle,
+        description: data.description?.trim() || '',
+        songs: data.songs || [],
+        trackCount: data.songs?.length || 0,
+        thumbnail: data.songs?.[0]?.thumbnail,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+
+      const updated = [newPlaylist, ...playlists];
+      savePlaylists(updated);
+      showToast(`Berhasil menyimpan playlist "${trimmedTitle}"!`);
+      return newPlaylist;
+    },
+    [playlists, savePlaylists, showToast]
+  );
+
+  const openShareModal = useCallback((playlist: Playlist) => {
+    setPlaylistToShare(playlist);
+    setIsShareModalOpen(true);
+  }, []);
+
+  const closeShareModal = useCallback(() => {
+    setIsShareModalOpen(false);
+    setPlaylistToShare(null);
+  }, []);
+
   return (
     <PlaylistContext.Provider
       value={{
@@ -206,10 +249,15 @@ export function PlaylistProvider({ children }: { children: React.ReactNode }) {
         removeSongFromPlaylist,
         isSongInPlaylist,
         getPlaylist,
+        importPlaylist,
         isAddToPlaylistOpen,
         songToAddToPlaylist,
         openAddToPlaylistModal,
         closeAddToPlaylistModal,
+        isShareModalOpen,
+        playlistToShare,
+        openShareModal,
+        closeShareModal,
       }}
     >
       {children}
