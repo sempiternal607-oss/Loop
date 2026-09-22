@@ -28,15 +28,23 @@ export function SyncedLyricsDrawer() {
     if (isLyricsOpen) {
       setShouldRender(true);
       setIsClosing(false);
+      document.body.style.overflow = 'hidden';
     } else if (shouldRender) {
       setIsClosing(true);
       const timer = setTimeout(() => {
         setShouldRender(false);
         setIsClosing(false);
+        document.body.style.overflow = '';
       }, 260);
       return () => clearTimeout(timer);
     }
   }, [isLyricsOpen, shouldRender]);
+
+  useEffect(() => {
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, []);
 
   const activeLineRef = useRef<HTMLButtonElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -73,20 +81,22 @@ export function SyncedLyricsDrawer() {
 
   return (
     <div
-      className={`lyrics-drawer fixed inset-0 z-50 bg-[#07080C]/95 backdrop-blur-3xl flex flex-col p-6 sm:p-10 ${
+      className={`lyrics-drawer fixed inset-0 z-50 bg-[#07080C]/95 backdrop-blur-3xl flex flex-col p-5 sm:p-10 overflow-hidden ${
         isClosing ? 'animate-modal-out' : 'animate-modal-in'
       }`}
     >
-      {/* Ambient background glow */}
-      <div
-        className="absolute inset-0 opacity-20 pointer-events-none blur-[100px] scale-125 transition-all duration-700"
-        style={{
-          backgroundImage: `url(${currentSong.thumbnail})`,
-          backgroundPosition: 'center',
-          backgroundSize: 'cover',
-        }}
-      />
-      <div className="lyrics-vignette-overlay absolute inset-0 bg-gradient-to-b from-[#07080C]/70 via-transparent to-[#07080C]/90 pointer-events-none" />
+      {/* Ambient background glow clipped inside overflow-hidden */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none -z-0">
+        <div
+          className="absolute inset-0 opacity-20 blur-[100px] scale-125 transition-all duration-700"
+          style={{
+            backgroundImage: `url(${currentSong.thumbnail})`,
+            backgroundPosition: 'center',
+            backgroundSize: 'cover',
+          }}
+        />
+        <div className="lyrics-vignette-overlay absolute inset-0 bg-gradient-to-b from-[#07080C]/70 via-transparent to-[#07080C]/90" />
+      </div>
 
       {/* Header */}
       <div className="relative flex flex-col md:flex-row md:items-center justify-between z-10 pb-5 border-b border-white/[0.08] max-w-4xl mx-auto w-full gap-3">

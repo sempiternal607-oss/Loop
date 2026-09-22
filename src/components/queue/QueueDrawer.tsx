@@ -24,15 +24,23 @@ export function QueueDrawer() {
     if (isQueueOpen) {
       setShouldRender(true);
       setIsClosing(false);
+      document.body.style.overflow = 'hidden';
     } else if (shouldRender) {
       setIsClosing(true);
       const timer = setTimeout(() => {
         setShouldRender(false);
         setIsClosing(false);
+        document.body.style.overflow = '';
       }, 260);
       return () => clearTimeout(timer);
     }
   }, [isQueueOpen, shouldRender]);
+
+  useEffect(() => {
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, []);
 
   if (!shouldRender) return null;
 
@@ -45,7 +53,7 @@ export function QueueDrawer() {
 
   return (
     <div
-      className={`queue-drawer fixed inset-y-0 right-0 z-50 w-full max-w-md bg-[#07080C]/95 border-l border-white/[0.08] backdrop-blur-2xl shadow-2xl flex flex-col p-6 ${
+      className={`queue-drawer fixed inset-y-0 right-0 z-50 w-full max-w-md bg-[#07080C]/95 border-l border-white/[0.08] backdrop-blur-2xl shadow-2xl flex flex-col p-6 overflow-hidden ${
         isClosing ? 'animate-drawer-out' : 'animate-drawer-in'
       }`}
     >
