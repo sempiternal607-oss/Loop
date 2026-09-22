@@ -28,6 +28,7 @@ interface PlayerContextType {
   lyrics: LyricsData | null;
   isLyricsLoading: boolean;
   isLyricsOpen: boolean;
+  lyricsOffset: number;
   isQueueOpen: boolean;
   isFullScreenPlayerOpen: boolean;
   favorites: Song[];
@@ -54,6 +55,9 @@ interface PlayerContextType {
   toggleLyrics: () => void;
   openLyrics: () => void;
   closeLyrics: () => void;
+  setLyricsOffset: (offset: number) => void;
+  adjustLyricsOffset: (delta: number) => void;
+  resetLyricsOffset: () => void;
   toggleQueue: () => void;
   openQueue: () => void;
   closeQueue: () => void;
@@ -101,6 +105,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [lyrics, setLyrics] = useState<LyricsData | null>(null);
   const [isLyricsLoading, setIsLyricsLoading] = useState<boolean>(false);
   const [isLyricsOpen, setIsLyricsOpen] = useState<boolean>(false);
+  const [lyricsOffset, setLyricsOffsetState] = useState<number>(0);
   const [isQueueOpen, setIsQueueOpen] = useState<boolean>(false);
   const [isFullScreenPlayerOpen, setIsFullScreenPlayerOpen] = useState<boolean>(false);
 
@@ -225,10 +230,26 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Lyrics Offset persistence
+  const loadLyricsOffset = useCallback((videoId: string) => {
+    try {
+      const saved = localStorage.getItem(`loop_lyric_offset_${videoId}`);
+      if (saved !== null) {
+        const parsed = parseFloat(saved);
+        if (!isNaN(parsed)) {
+          setLyricsOffsetState(parsed);
+          return;
+        }
+      }
+    } catch {}
+    setLyricsOffsetState(0);
+  }, []);
+
   // Fetch Lyrics
   const fetchLyrics = useCallback(async (song: Song) => {
     setIsLyricsLoading(true);
     setLyrics(null);
+    loadLyricsOffset(song.videoId);
     try {
       const query = new URLSearchParams({
         title: song.title,
@@ -245,7 +266,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLyricsLoading(false);
     }
-  }, []);
+  }, [loadLyricsOffset]);
 
   // Fetch Auto Radio Queue
   const fetchAutoRadioQueue = useCallback(async (song: Song): Promise<Song[]> => {
@@ -677,6 +698,42 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const openLyrics = useCallback(() => setIsLyricsOpen(true), []);
   const closeLyrics = useCallback(() => setIsLyricsOpen(false), []);
 
+  const setLyricsOffset = useCallback((offset: number) => {
+    const rounded = Math.round(offset * 10) / 10;
+    const clamped = Math.max(-60, Math.min(60, rounded));
+    setLyricsOffsetState(clamped);
+    if (currentSongRef.current?.videoId) {
+      try {
+        if (clamped === 0) {
+          localStorage.removeItem(`loop_lyric_offset_${currentSongRef.current.videoId}`);
+        } else {
+          localStorage.setItem(`loop_lyric_offset_${currentSongRef.current.videoId}`, String(clamped));
+        }
+      } catch {}
+    }
+  }, []);
+
+  const adjustLyricsOffset = useCallback((delta: number) => {
+    setLyricsOffsetState((prev) => {
+      const rounded = Math.round((prev + delta) * 10) / 10;
+      const clamped = Math.max(-60, Math.min(60, rounded));
+      if (currentSongRef.current?.videoId) {
+        try {
+          if (clamped === 0) {
+            localStorage.removeItem(`loop_lyric_offset_${currentSongRef.current.videoId}`);
+          } else {
+            localStorage.setItem(`loop_lyric_offset_${currentSongRef.current.videoId}`, String(clamped));
+          }
+        } catch {}
+      }
+      return clamped;
+    });
+  }, []);
+
+  const resetLyricsOffset = useCallback(() => {
+    setLyricsOffset(0);
+  }, [setLyricsOffset]);
+
   const toggleQueue = useCallback(() => setIsQueueOpen((p) => !p), []);
   const openQueue = useCallback(() => setIsQueueOpen(true), []);
   const closeQueue = useCallback(() => setIsQueueOpen(false), []);
@@ -724,6 +781,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         lyrics,
         isLyricsLoading,
         isLyricsOpen,
+        lyricsOffset,
         isQueueOpen,
         isFullScreenPlayerOpen,
         favorites,
@@ -749,6 +807,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         toggleLyrics,
         openLyrics,
         closeLyrics,
+        setLyricsOffset,
+        adjustLyricsOffset,
+        resetLyricsOffset,
         toggleQueue,
         openQueue,
         closeQueue,

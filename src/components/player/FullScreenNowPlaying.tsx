@@ -31,6 +31,7 @@ export function FullScreenNowPlaying() {
     repeatMode,
     isShuffle,
     lyrics,
+    lyricsOffset,
     isFullScreenPlayerOpen,
     closeFullScreen,
     togglePlay,
@@ -72,9 +73,10 @@ export function FullScreenNowPlaying() {
 
   const isLiked = isFavorite(currentSong.videoId);
 
-  // Find currently active lyric line for preview
+  // Find currently active lyric line for preview with offset applied
+  const effectiveProgress = progress + lyricsOffset;
   const currentLine = lyrics?.synced
-    ? [...lyrics.lines].reverse().find((line) => progress >= line.time)
+    ? [...lyrics.lines].reverse().find((line) => effectiveProgress >= line.time)
     : null;
 
   return (

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { X, Mic2, Music2 } from 'lucide-react';
+import { X, Mic2, Music2, Timer, RotateCcw } from 'lucide-react';
 import { usePlayer } from '@/context/PlayerContext';
 
 export function SyncedLyricsDrawer() {
@@ -13,6 +13,9 @@ export function SyncedLyricsDrawer() {
     closeLyrics,
     progress,
     seek,
+    lyricsOffset,
+    adjustLyricsOffset,
+    resetLyricsOffset,
   } = usePlayer();
 
   const [shouldRender, setShouldRender] = useState(isLyricsOpen);
@@ -35,7 +38,7 @@ export function SyncedLyricsDrawer() {
   const activeLineRef = useRef<HTMLButtonElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  // Auto-scroll to active lyric
+  // Auto-scroll to active lyric with offset considered
   useEffect(() => {
     if (activeLineRef.current && containerRef.current && isLyricsOpen) {
       activeLineRef.current.scrollIntoView({
@@ -43,7 +46,7 @@ export function SyncedLyricsDrawer() {
         block: 'center',
       });
     }
-  }, [progress, isLyricsOpen]);
+  }, [progress, lyricsOffset, isLyricsOpen]);
 
   if (!shouldRender || !currentSong) return null;
 
@@ -52,11 +55,12 @@ export function SyncedLyricsDrawer() {
     closeLyrics();
   };
 
-  // Determine current active lyric line index
+  // Determine current active lyric line index with sync offset
+  const effectiveProgress = progress + lyricsOffset;
   let activeIndex = -1;
   if (lyrics?.synced && lyrics.lines.length > 0) {
     for (let i = 0; i < lyrics.lines.length; i++) {
-      if (progress >= lyrics.lines[i].time) {
+      if (effectiveProgress >= lyrics.lines[i].time) {
         activeIndex = i;
       } else {
         break;
@@ -82,28 +86,121 @@ export function SyncedLyricsDrawer() {
       <div className="lyrics-vignette-overlay absolute inset-0 bg-gradient-to-b from-[#07080C]/70 via-transparent to-[#07080C]/90 pointer-events-none" />
 
       {/* Header */}
-      <div className="relative flex items-center justify-between z-10 pb-6 border-b border-white/[0.08] max-w-4xl mx-auto w-full">
-        <div className="flex items-center gap-3.5">
-          <div className="p-2.5 rounded-2xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 shadow-lg shadow-emerald-500/10">
-            <Mic2 className="w-5 h-5" />
+      <div className="relative flex flex-col sm:flex-row sm:items-center justify-between z-10 pb-5 border-b border-white/[0.08] max-w-4xl mx-auto w-full gap-3">
+        <div className="flex items-center justify-between sm:justify-start gap-3.5">
+          <div className="flex items-center gap-3.5 min-w-0">
+            <div className="p-2.5 rounded-2xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 shadow-lg shadow-emerald-500/10 shrink-0">
+              <Mic2 className="w-5 h-5" />
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span className="text-base sm:text-lg font-black text-white tracking-tight truncate">{currentSong.title}</span>
+              <span className="text-xs text-slate-400 font-medium flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block shrink-0" />
+                {lyrics?.synced ? 'Real-time Synced Karaoke' : 'Lyrics'}
+              </span>
+            </div>
           </div>
-          <div className="flex flex-col">
-            <span className="text-base sm:text-lg font-black text-white tracking-tight">{currentSong.title}</span>
-            <span className="text-xs text-slate-400 font-medium flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
-              {lyrics?.synced ? 'Real-time Synced Karaoke' : 'Lyrics'} {lyrics?.source ? `• ${lyrics.source}` : ''}
-            </span>
-          </div>
+
+          {/* Mobile close button */}
+          <button
+            type="button"
+            onClick={handleClose}
+            className="sm:hidden w-10 h-10 rounded-2xl bg-white/[0.05] border border-white/[0.08] text-slate-400 hover:text-white hover:bg-white/[0.1] flex items-center justify-center transition-all duration-200 active:scale-90 shrink-0"
+            title="Close lyrics"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
-        <button
-          type="button"
-          onClick={handleClose}
-          className="w-10 h-10 rounded-2xl bg-white/[0.05] border border-white/[0.08] text-slate-400 hover:text-white hover:bg-white/[0.1] flex items-center justify-center transition-all duration-200 active:scale-90"
-          title="Close lyrics"
-        >
-          <X className="w-5 h-5" />
-        </button>
+        <div className="flex items-center justify-between sm:justify-end gap-2.5">
+          {/* Sync Offset Controls (only visible when lyrics are synced) */}
+          {lyrics?.synced && (
+            <div className="flex items-center gap-1 bg-white/[0.04] border border-white/[0.08] p-1 rounded-2xl shadow-inner backdrop-blur-md">
+              <div className="flex items-center gap-1.5 px-2 py-1 text-slate-300">
+                <Timer className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span className="text-[11px] font-semibold text-slate-400 hidden xs:inline">Sync:</span>
+                <span
+                  className={`px-1.5 py-0.5 rounded font-mono text-[11px] font-bold ${
+                    lyricsOffset === 0
+                      ? 'text-slate-400'
+                      : lyricsOffset > 0
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                      : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                  }`}
+                  title={
+                    lyricsOffset === 0
+                      ? 'No offset'
+                      : lyricsOffset > 0
+                      ? `Lyrics shifted ${lyricsOffset.toFixed(1)}s earlier`
+                      : `Lyrics delayed ${Math.abs(lyricsOffset).toFixed(1)}s`
+                  }
+                >
+                  {lyricsOffset > 0 ? `+${lyricsOffset.toFixed(1)}s` : `${lyricsOffset.toFixed(1)}s`}
+                </span>
+              </div>
+
+              <div className="h-4 w-px bg-white/[0.08]" />
+
+              <button
+                type="button"
+                onClick={() => adjustLyricsOffset(-0.5)}
+                className="px-2 py-1 rounded-xl bg-white/[0.03] hover:bg-white/[0.1] text-slate-300 hover:text-white font-medium transition active:scale-90 text-[11px]"
+                title="Delay lyrics by 0.5s (if lyrics appear too fast)"
+              >
+                -0.5s
+              </button>
+
+              <button
+                type="button"
+                onClick={() => adjustLyricsOffset(-0.1)}
+                className="px-1.5 py-1 rounded-xl bg-white/[0.03] hover:bg-white/[0.1] text-slate-300 hover:text-white font-medium transition active:scale-90 text-[11px]"
+                title="Delay lyrics by 0.1s"
+              >
+                -0.1s
+              </button>
+
+              {lyricsOffset !== 0 ? (
+                <button
+                  type="button"
+                  onClick={resetLyricsOffset}
+                  className="px-2 py-1 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/25 flex items-center gap-1 transition active:scale-90 text-[11px] font-medium"
+                  title="Reset offset to 0.0s"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span className="hidden md:inline">Reset</span>
+                </button>
+              ) : null}
+
+              <button
+                type="button"
+                onClick={() => adjustLyricsOffset(0.1)}
+                className="px-1.5 py-1 rounded-xl bg-white/[0.03] hover:bg-white/[0.1] text-slate-300 hover:text-white font-medium transition active:scale-90 text-[11px]"
+                title="Advance lyrics by 0.1s"
+              >
+                +0.1s
+              </button>
+
+              <button
+                type="button"
+                onClick={() => adjustLyricsOffset(0.5)}
+                className="px-2 py-1 rounded-xl bg-white/[0.03] hover:bg-white/[0.1] text-slate-300 hover:text-white font-medium transition active:scale-90 text-[11px]"
+                title="Advance lyrics by 0.5s (if lyrics appear too slow)"
+              >
+                +0.5s
+              </button>
+            </div>
+          )}
+
+          {/* Desktop close button */}
+          <button
+            type="button"
+            onClick={handleClose}
+            className="hidden sm:flex w-10 h-10 rounded-2xl bg-white/[0.05] border border-white/[0.08] text-slate-400 hover:text-white hover:bg-white/[0.1] items-center justify-center transition-all duration-200 active:scale-90 shrink-0"
+            title="Close lyrics"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
       </div>
 
       {/* Lyrics Scrollable Container */}
@@ -143,7 +240,7 @@ export function SyncedLyricsDrawer() {
                 type="button"
                 onClick={() => {
                   if (lyrics.synced) {
-                    seek(line.time);
+                    seek(Math.max(0, line.time - lyricsOffset));
                   }
                 }}
                 className={`text-left transition-all duration-300 rounded-2xl px-5 py-3 hover:bg-white/[0.05] cursor-pointer ${
@@ -163,9 +260,17 @@ export function SyncedLyricsDrawer() {
         )}
       </div>
 
-      <div className="relative text-center text-xs text-slate-400 z-10 pt-4 flex items-center justify-center gap-2">
-        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/60" />
-        <span>Tap any line to jump directly to that part of the song</span>
+      <div className="relative text-center text-xs text-slate-400 z-10 pt-4 flex flex-col sm:flex-row items-center justify-center gap-2">
+        <div className="flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/60" />
+          <span>Tap any line to jump directly to that part of the song</span>
+        </div>
+        {lyrics?.synced && (
+          <>
+            <span className="hidden sm:inline text-slate-600">•</span>
+            <span className="text-slate-500 text-[11px]">Use +/- buttons above to fine-tune timing</span>
+          </>
+        )}
       </div>
     </div>
   );
