@@ -46,58 +46,61 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const calculateRelevance = (song: Song): number => {
+    const calculateScore = (song: Song): number => {
       if (queryTokens.length === 0) return 0;
-      const text = `${song.title} ${song.artist}`.toLowerCase();
-      let matches = 0;
+      const titleLower = song.title.toLowerCase();
+      const artistLower = song.artist.toLowerCase();
+      const combined = `${titleLower} ${artistLower}`;
+
+      let matchedTokens = 0;
       for (const token of queryTokens) {
-        if (text.includes(token)) matches++;
+        if (combined.includes(token)) matchedTokens++;
       }
-      return matches / queryTokens.length;
+      const tokenMatchRatio = matchedTokens / queryTokens.length;
+
+      // Full query match bonus: massive boost when ALL query tokens match (e.g. both artist AND title match)
+      const fullMatchBonus = tokenMatchRatio === 1.0 ? 0.5 : 0;
+
+      // Official release bonus: official audio releases win first place when query matches both
+      const officialBonus = !song.isVideo ? 0.25 : 0;
+
+      // Exact title bonus
+      const exactTitleBonus = titleLower === trimmed.toLowerCase() ? 0.2 : 0;
+
+      return tokenMatchRatio + fullMatchBonus + officialBonus + exactTitleBonus;
     };
 
-    const songs: Song[] = [];
-    const seenIds = new Set<string>();
-
-    const addSong = (s: Song) => {
-      if (!seenIds.has(s.videoId)) {
-        seenIds.add(s.videoId);
-        songs.push(s);
-      }
-    };
+    const candidateMap = new Map<string, Song>();
 
     if (filter === 'videos') {
-      // Prioritize video items and general uploads
-      for (const s of parsedGeneral) {
-        if (s.isVideo) addSong(s);
+      // Videos & covers filter: collect general and video items
+      for (const s of parsedGeneral) candidateMap.set(s.videoId, s);
+      for (const s of parsedSongs) {
+        if (s.isVideo && !candidateMap.has(s.videoId)) candidateMap.set(s.videoId, s);
       }
-      for (const s of parsedGeneral) addSong(s);
     } else if (filter === 'songs') {
-      // Prioritize official songs first
-      for (const s of parsedSongs) addSong(s);
-      // If official songs have no high-match or few items, supplement from general uploads
-      const hasHighMatch = songs.some((s) => calculateRelevance(s) >= 0.75);
-      if (!hasHighMatch || songs.length < 5) {
+      // Songs only: prioritize official releases
+      for (const s of parsedSongs) candidateMap.set(s.videoId, s);
+      // If official songs have no high match or few items, supplement matching community uploads
+      const hasHighMatch = Array.from(candidateMap.values()).some((s) => calculateScore(s) >= 1.0);
+      if (!hasHighMatch || candidateMap.size < 5) {
         for (const s of parsedGeneral) {
-          if (calculateRelevance(s) >= 0.6) addSong(s);
+          if (!candidateMap.has(s.videoId)) candidateMap.set(s.videoId, s);
         }
       }
-      // Fill remaining if list is still small
-      if (songs.length < 10) {
-        for (const s of parsedGeneral) addSong(s);
-      }
     } else {
-      // Hybrid default ('all'):
-      // 1. If general results contain top exact/high keyword matches (e.g. non-official releases like Naif - Dimana Aku Disini)
-      const topGeneralMatches = parsedGeneral.slice(0, 5).filter((s) => calculateRelevance(s) >= 0.75);
-      for (const s of topGeneralMatches) addSong(s);
-
-      // 2. Add official songs
-      for (const s of parsedSongs) addSong(s);
-
-      // 3. Add remaining general uploads, music videos, and covers
-      for (const s of parsedGeneral) addSong(s);
+      // Default ('all'): merge both sources for comprehensive results
+      for (const s of parsedSongs) candidateMap.set(s.videoId, s);
+      for (const s of parsedGeneral) {
+        if (!candidateMap.has(s.videoId)) candidateMap.set(s.videoId, s);
+      }
     }
+
+    // Sort candidates using unified scoring:
+    // 1. Exact & full matches with user's artist + title rank highest
+    // 2. Official audio releases get priority bonus over unofficial uploads whenever both exist
+    // 3. Community uploads step in when no official audio release matches the query
+    const songs = Array.from(candidateMap.values()).sort((a, b) => calculateScore(b) - calculateScore(a));
 
     // Extract artist spotlight card if available in general search
     const artist: ArtistSummary | null = generalData ? extractArtistFromSearch(generalData) : null;
