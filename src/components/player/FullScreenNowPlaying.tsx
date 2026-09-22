@@ -255,7 +255,14 @@ export function FullScreenNowPlaying() {
               <Mic2 className="w-4 h-4" />
             </div>
             <div className="flex flex-col overflow-hidden">
-              <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Synced Lyrics</span>
+              <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest flex items-center gap-1.5">
+                <span>Synced Lyrics</span>
+                {lyricsOffset !== 0 && (
+                  <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 normal-case tracking-normal">
+                    {lyricsOffset > 0 ? `+${lyricsOffset.toFixed(1)}s` : `${lyricsOffset.toFixed(1)}s`}
+                  </span>
+                )}
+              </span>
               <span className="text-sm font-semibold text-slate-200 truncate group-hover:text-white transition-colors">
                 {currentLine ? currentLine.text : 'Tap to open full synchronized lyrics'}
               </span>
