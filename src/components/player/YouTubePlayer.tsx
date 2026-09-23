@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { usePlayer } from '@/context/PlayerContext';
 import { useToast } from '@/components/ui/Toast';
 
@@ -65,7 +65,6 @@ export function YouTubePlayer() {
     _handleSongEnded,
     next,
     prev,
-    togglePlay,
     pause,
     resume,
   } = usePlayer();
@@ -81,6 +80,29 @@ export function YouTubePlayer() {
   const isChangingTrackRef = useRef<boolean>(false);
   const repeatModeRef = useRef(repeatMode);
   repeatModeRef.current = repeatMode;
+
+  const handleEnded = useCallback(() => {
+    if (isChangingTrackRef.current) return;
+    isChangingTrackRef.current = true;
+
+    if (repeatModeRef.current === 'one') {
+      playerRef.current?.seekTo(0, true);
+      playerRef.current?.playVideo();
+      _setProgress(0);
+      _setIsPlaying(true);
+      setTimeout(() => {
+        isChangingTrackRef.current = false;
+      }, 500);
+    } else {
+      _handleSongEnded();
+    }
+  }, [_handleSongEnded, _setProgress, _setIsPlaying]);
+
+  const handleEndedRef = useRef(handleEnded);
+  handleEndedRef.current = handleEnded;
+
+  const nextRef = useRef(next);
+  nextRef.current = next;
 
   // 1. Load YouTube IFrame API Script
   useEffect(() => {
@@ -111,31 +133,44 @@ export function YouTubePlayer() {
               isChangingTrackRef.current = false;
               _setIsPlaying(true);
             } else if (e.data === window.YT.PlayerState.PAUSED) {
+              const curTime = playerRef.current?.getCurrentTime() || 0;
+              const dur = playerRef.current?.getDuration() || 0;
+
+              // If paused near the end of song (common on mobile background play), treat as track ended!
+              if (dur > 5 && dur - curTime <= 1.5) {
+                handleEndedRef.current();
+                return;
+              }
+
               // Ignore transient PAUSED state during track loading transition
               if (isChangingTrackRef.current) {
                 playerRef.current?.playVideo();
                 return;
               }
+
+              // If paused unexpectedly by browser background throttling while user intended to play
+              if (document.visibilityState === 'hidden' && isPlayingRef.current) {
+                try {
+                  playerRef.current?.playVideo();
+                } catch (err) {
+                  console.warn('[YouTube Player] Background auto-resume failed', err);
+                }
+                return;
+              }
+
               _setIsPlaying(false);
             } else if (e.data === window.YT.PlayerState.CUED) {
               // Video cued, start playing immediately
               playerRef.current?.playVideo();
             } else if (e.data === window.YT.PlayerState.ENDED) {
-              isChangingTrackRef.current = false;
-              if (repeatModeRef.current === 'one') {
-                playerRef.current?.seekTo(0, true);
-                playerRef.current?.playVideo();
-                _setProgress(0);
-                _setIsPlaying(true);
-              } else {
-                _handleSongEnded();
-              }
+              handleEndedRef.current();
             }
           },
           onError: (e) => {
             console.warn('[YouTube Player] Error occurred:', e.data);
             showToast('Playback error, skipping to next track…');
-            setTimeout(() => next(), 1000);
+            isChangingTrackRef.current = true;
+            nextRef.current();
           },
         },
       });
@@ -158,7 +193,7 @@ export function YouTubePlayer() {
     return () => {
       // Keep player alive for background audio
     };
-  }, [_setIsPlaying, _handleSongEnded, next, showToast, volume]);
+  }, [_setIsPlaying, volume, showToast]);
 
   // 2. Handle Song Change
   useEffect(() => {
@@ -169,9 +204,14 @@ export function YouTubePlayer() {
       skippedSegmentsRef.current.clear();
       isChangingTrackRef.current = true;
 
+      // Ensure mediaSession stays in 'playing' state during transition
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.playbackState = 'playing';
+      }
+
       playerRef.current.loadVideoById({
         videoId: currentSong.videoId,
-        suggestedQuality: 'hd720',
+        suggestedQuality: 'small', // Lightest video stream for instant audio playback on mobile
       });
 
       playerRef.current.playVideo();
@@ -210,7 +250,7 @@ export function YouTubePlayer() {
     }
   }, [_seekTarget, _clearSeekTarget]);
 
-  // 6. Time Progress & SponsorBlock Watcher Loop
+  // 6. Time Progress, Watchdog & SponsorBlock Watcher Loop
   useEffect(() => {
     const interval = setInterval(() => {
       if (!playerRef.current || !isReadyRef.current || !isPlaying) return;
@@ -221,6 +261,17 @@ export function YouTubePlayer() {
 
         if (typeof currentTime === 'number' && !isNaN(currentTime)) {
           _setProgress(currentTime);
+
+          // Watchdog: If playback is within 0.5s of song end, trigger track end (prevents stalling on locked screen)
+          if (
+            typeof duration === 'number' &&
+            duration > 5 &&
+            currentTime >= duration - 0.5 &&
+            !isChangingTrackRef.current
+          ) {
+            handleEndedRef.current();
+            return;
+          }
 
           // SponsorBlock auto-skip detection
           if (sponsorBlockEnabled && activeSegments.length > 0) {
@@ -248,7 +299,8 @@ export function YouTubePlayer() {
           if (
             'mediaSession' in navigator &&
             'setPositionState' in navigator.mediaSession &&
-            duration > 0
+            duration > 0 &&
+            !isChangingTrackRef.current
           ) {
             try {
               navigator.mediaSession.setPositionState({
@@ -270,35 +322,32 @@ export function YouTubePlayer() {
   }, [isPlaying, sponsorBlockEnabled, activeSegments, _setProgress, _setDuration, showToast]);
 
   // 7. MediaSession API integration for System Notifications & Lock Screen Controls
-  useEffect(() => {
-    if (typeof window === 'undefined' || !('mediaSession' in navigator) || !currentSong) return;
+  const actionHandlersRef = useRef({ resume, pause, next, prev, _setProgress });
+  actionHandlersRef.current = { resume, pause, next, prev, _setProgress };
 
-    navigator.mediaSession.metadata = new MediaMetadata({
-      title: currentSong.title,
-      artist: currentSong.artist,
-      album: currentSong.album || 'Loop Music',
-      artwork: [
-        { src: currentSong.thumbnail, sizes: '96x96', type: 'image/jpeg' },
-        { src: currentSong.thumbnail, sizes: '256x256', type: 'image/jpeg' },
-        { src: currentSong.thumbnail, sizes: '512x512', type: 'image/jpeg' },
-      ],
-    });
+  // Register action handlers ONCE on mount so Android lock screen notification is never torn down
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('mediaSession' in navigator)) return;
 
     navigator.mediaSession.setActionHandler('play', () => {
-      resume();
+      actionHandlersRef.current.resume();
       playerRef.current?.playVideo();
     });
     navigator.mediaSession.setActionHandler('pause', () => {
-      pause();
+      actionHandlersRef.current.pause();
       playerRef.current?.pauseVideo();
     });
-    navigator.mediaSession.setActionHandler('nexttrack', () => next());
-    navigator.mediaSession.setActionHandler('previoustrack', () => prev());
+    navigator.mediaSession.setActionHandler('nexttrack', () => {
+      actionHandlersRef.current.next();
+    });
+    navigator.mediaSession.setActionHandler('previoustrack', () => {
+      actionHandlersRef.current.prev();
+    });
     navigator.mediaSession.setActionHandler('seekto', (details) => {
       if (details.seekTime !== undefined && details.seekTime !== null) {
         playerRef.current?.seekTo(details.seekTime, true);
-        _setProgress(details.seekTime);
-        if ('mediaSession' in navigator && 'setPositionState' in navigator.mediaSession) {
+        actionHandlersRef.current._setProgress(details.seekTime);
+        if ('setPositionState' in navigator.mediaSession) {
           try {
             const d = playerRef.current?.getDuration() || 0;
             navigator.mediaSession.setPositionState({
@@ -318,12 +367,44 @@ export function YouTubePlayer() {
       navigator.mediaSession.setActionHandler('previoustrack', null);
       navigator.mediaSession.setActionHandler('seekto', null);
     };
-  }, [currentSong, resume, pause, next, prev, _setProgress]);
+  }, []);
+
+  // Update MediaSession Metadata & Position State on song change
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('mediaSession' in navigator) || !currentSong) return;
+
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: currentSong.title,
+      artist: currentSong.artist,
+      album: currentSong.album || 'Loop Music',
+      artwork: [
+        { src: currentSong.thumbnail, sizes: '96x96', type: 'image/jpeg' },
+        { src: currentSong.thumbnail, sizes: '256x256', type: 'image/jpeg' },
+        { src: currentSong.thumbnail, sizes: '512x512', type: 'image/jpeg' },
+      ],
+    });
+
+    navigator.mediaSession.playbackState = 'playing';
+
+    if ('setPositionState' in navigator.mediaSession && currentSong.duration && currentSong.duration > 0) {
+      try {
+        navigator.mediaSession.setPositionState({
+          duration: currentSong.duration,
+          playbackRate: 1,
+          position: 0,
+        });
+      } catch {}
+    }
+  }, [currentSong]);
 
   // Sync playbackState with navigator.mediaSession
   useEffect(() => {
     if (typeof window !== 'undefined' && 'mediaSession' in navigator) {
-      navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+      if (isChangingTrackRef.current) {
+        navigator.mediaSession.playbackState = 'playing';
+      } else {
+        navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+      }
     }
   }, [isPlaying]);
 
@@ -355,7 +436,7 @@ export function YouTubePlayer() {
   return (
     <div
       id="loop-yt-holder"
-      className="fixed bottom-0 right-0 w-8 h-8 opacity-[0.01] pointer-events-none overflow-hidden z-[-1]"
+      className="fixed bottom-0 right-0 w-16 h-16 opacity-[0.005] pointer-events-none overflow-hidden z-[-1]"
       aria-hidden="true"
     >
       <div id="loop-yt-iframe" />

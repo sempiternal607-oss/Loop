@@ -280,7 +280,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           setQueue((prevQueue) => {
             const existingIds = new Set(prevQueue.map((s) => s.videoId));
             const newSongs = songs.filter((s: Song) => !existingIds.has(s.videoId));
-            return [...prevQueue, ...newSongs];
+            const updated = [...prevQueue, ...newSongs];
+            queueRef.current = updated;
+            return updated;
           });
           return songs;
         }
@@ -482,6 +484,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       const nextSong = targetQueue[targetIdx];
       if (!nextSong) return;
 
+      queueRef.current = targetQueue;
       setCurrentIndex(targetIdx);
       setCurrentSong(nextSong);
       setProgress(0);
@@ -508,7 +511,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
               setQueue((prevQ) => {
                 const existingIds = new Set(prevQ.map((s) => s.videoId));
                 const fresh = moreSongs.filter((s) => !existingIds.has(s.videoId));
-                return [...prevQ, ...fresh];
+                const updated = [...prevQ, ...fresh];
+                queueRef.current = updated;
+                return updated;
               });
             }
           });
@@ -533,6 +538,20 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     } else {
       // Reached the end of the Playback Queue: fetch more smart similar songs and append to queue
       if (curSong) {
+        // 1. Try to use cached radio tracks immediately to avoid network pause in background
+        const cachedSongs = radioTracksMapRef.current.get(curSong.videoId) || [];
+        const playedIds = new Set(q.map((s) => s.videoId));
+        const freshCached = cachedSongs.filter((s) => !playedIds.has(s.videoId));
+
+        if (freshCached.length > 0) {
+          const updatedQ = [...q, ...freshCached];
+          queueRef.current = updatedQ;
+          setQueue(updatedQ);
+          playAtIndex(q.length, updatedQ);
+          return;
+        }
+
+        // 2. Fetch more upcoming songs asynchronously if not cached
         if (isShuffleRef.current) {
           const session = smartShuffleService.getSession() || smartShuffleService.initializeSession(curSong, q);
           const context = buildShuffleContext({
@@ -544,30 +563,42 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           });
           smartShuffleService.generateSmartUpcoming(context, fetchAutoRadioQueue).then((moreSongs) => {
             if (moreSongs.length > 0) {
-              const playedIds = new Set(q.map((s) => s.videoId));
-              const fresh = moreSongs.filter((s) => !playedIds.has(s.videoId));
+              const playedIdsSet = new Set(queueRef.current.map((s) => s.videoId));
+              const fresh = moreSongs.filter((s) => !playedIdsSet.has(s.videoId));
               if (fresh.length > 0) {
-                const updatedQ = [...q, ...fresh];
+                const updatedQ = [...queueRef.current, ...fresh];
+                queueRef.current = updatedQ;
                 setQueue(updatedQ);
-                playAtIndex(q.length, updatedQ);
+                playAtIndex(queueRef.current.length - fresh.length, updatedQ);
                 return;
               }
             }
-            setIsPlaying(false);
+            // Continuous radio fallback: replay queue instead of stopping and losing lock screen notification
+            if (queueRef.current.length > 0) {
+              playAtIndex(0, queueRef.current);
+            } else {
+              setIsPlaying(false);
+            }
           });
         } else {
           fetchAutoRadioQueue(curSong).then((moreSongs) => {
             if (moreSongs.length > 0) {
-              const playedIds = new Set(q.map((s) => s.videoId));
-              const fresh = moreSongs.filter((s) => !playedIds.has(s.videoId));
+              const playedIdsSet = new Set(queueRef.current.map((s) => s.videoId));
+              const fresh = moreSongs.filter((s) => !playedIdsSet.has(s.videoId));
               if (fresh.length > 0) {
-                const updatedQ = [...q, ...fresh];
+                const updatedQ = [...queueRef.current, ...fresh];
+                queueRef.current = updatedQ;
                 setQueue(updatedQ);
-                playAtIndex(q.length, updatedQ);
+                playAtIndex(queueRef.current.length - fresh.length, updatedQ);
                 return;
               }
             }
-            setIsPlaying(false);
+            // Continuous radio fallback: replay queue instead of stopping and losing lock screen notification
+            if (queueRef.current.length > 0) {
+              playAtIndex(0, queueRef.current);
+            } else {
+              setIsPlaying(false);
+            }
           });
         }
       } else {
