@@ -81,6 +81,17 @@ export function YouTubePlayer() {
   const repeatModeRef = useRef(repeatMode);
   repeatModeRef.current = repeatMode;
 
+  const audioAnchorRef = useRef<HTMLAudioElement | null>(null);
+
+  const syncAudioAnchor = useCallback((play: boolean) => {
+    if (!audioAnchorRef.current) return;
+    if (play) {
+      audioAnchorRef.current.play().catch(() => {});
+    } else {
+      audioAnchorRef.current.pause();
+    }
+  }, []);
+
   const handleEnded = useCallback(() => {
     if (isChangingTrackRef.current) return;
     isChangingTrackRef.current = true;
@@ -132,6 +143,7 @@ export function YouTubePlayer() {
             if (e.data === window.YT.PlayerState.PLAYING) {
               isChangingTrackRef.current = false;
               _setIsPlaying(true);
+              syncAudioAnchor(true);
             } else if (e.data === window.YT.PlayerState.PAUSED) {
               const curTime = playerRef.current?.getCurrentTime() || 0;
               const dur = playerRef.current?.getDuration() || 0;
@@ -145,6 +157,7 @@ export function YouTubePlayer() {
               // Ignore transient PAUSED state during track loading transition
               if (isChangingTrackRef.current) {
                 playerRef.current?.playVideo();
+                syncAudioAnchor(true);
                 return;
               }
 
@@ -152,6 +165,7 @@ export function YouTubePlayer() {
               if (document.visibilityState === 'hidden' && isPlayingRef.current) {
                 try {
                   playerRef.current?.playVideo();
+                  syncAudioAnchor(true);
                 } catch (err) {
                   console.warn('[YouTube Player] Background auto-resume failed', err);
                 }
@@ -159,9 +173,11 @@ export function YouTubePlayer() {
               }
 
               _setIsPlaying(false);
+              syncAudioAnchor(false);
             } else if (e.data === window.YT.PlayerState.CUED) {
               // Video cued, start playing immediately
               playerRef.current?.playVideo();
+              syncAudioAnchor(true);
             } else if (e.data === window.YT.PlayerState.ENDED) {
               handleEndedRef.current();
             }
@@ -193,7 +209,7 @@ export function YouTubePlayer() {
     return () => {
       // Keep player alive for background audio
     };
-  }, [_setIsPlaying, volume, showToast]);
+  }, [_setIsPlaying, volume, showToast, syncAudioAnchor]);
 
   // 2. Handle Song Change
   useEffect(() => {
@@ -215,8 +231,9 @@ export function YouTubePlayer() {
       });
 
       playerRef.current.playVideo();
+      syncAudioAnchor(true);
     }
-  }, [currentSong]);
+  }, [currentSong, syncAudioAnchor]);
 
   // 3. Handle Play / Pause
   useEffect(() => {
@@ -224,13 +241,15 @@ export function YouTubePlayer() {
     try {
       if (isPlaying) {
         playerRef.current.playVideo();
+        syncAudioAnchor(true);
       } else {
         playerRef.current.pauseVideo();
+        syncAudioAnchor(false);
       }
     } catch (e) {
       console.error(e);
     }
-  }, [isPlaying]);
+  }, [isPlaying, syncAudioAnchor]);
 
   // 4. Handle Volume
   useEffect(() => {
@@ -332,16 +351,20 @@ export function YouTubePlayer() {
     navigator.mediaSession.setActionHandler('play', () => {
       actionHandlersRef.current.resume();
       playerRef.current?.playVideo();
+      audioAnchorRef.current?.play().catch(() => {});
     });
     navigator.mediaSession.setActionHandler('pause', () => {
       actionHandlersRef.current.pause();
       playerRef.current?.pauseVideo();
+      audioAnchorRef.current?.pause();
     });
     navigator.mediaSession.setActionHandler('nexttrack', () => {
       actionHandlersRef.current.next();
+      audioAnchorRef.current?.play().catch(() => {});
     });
     navigator.mediaSession.setActionHandler('previoustrack', () => {
       actionHandlersRef.current.prev();
+      audioAnchorRef.current?.play().catch(() => {});
     });
     navigator.mediaSession.setActionHandler('seekto', (details) => {
       if (details.seekTime !== undefined && details.seekTime !== null) {
@@ -408,7 +431,25 @@ export function YouTubePlayer() {
     }
   }, [isPlaying]);
 
-  // 8. Visibility watcher: Re-assert playback on wake/unlock
+  // 8. User interaction gesture unlocker for background audio anchor
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleUserInteraction = () => {
+      if (isPlayingRef.current && audioAnchorRef.current && audioAnchorRef.current.paused) {
+        audioAnchorRef.current.play().catch(() => {});
+      }
+    };
+
+    window.addEventListener('click', handleUserInteraction, { passive: true });
+    window.addEventListener('touchstart', handleUserInteraction, { passive: true });
+    return () => {
+      window.removeEventListener('click', handleUserInteraction);
+      window.removeEventListener('touchstart', handleUserInteraction);
+    };
+  }, []);
+
+  // 9. Visibility watcher: Re-assert playback on wake/unlock
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -424,6 +465,7 @@ export function YouTubePlayer() {
             // Ignore
           }
         }
+        audioAnchorRef.current?.play().catch(() => {});
       }
     };
 
@@ -434,12 +476,26 @@ export function YouTubePlayer() {
   }, []);
 
   return (
-    <div
-      id="loop-yt-holder"
-      className="fixed bottom-0 right-0 w-16 h-16 opacity-[0.005] pointer-events-none overflow-hidden z-[-1]"
-      aria-hidden="true"
-    >
-      <div id="loop-yt-iframe" />
-    </div>
+    <>
+      {/* Background Audio Anchor: Plays in the top-level document context so Android/iOS
+          OS MediaSession notification bar and lockscreen player stay persistently active
+          even when the app is minimized, locked, or running in the background. */}
+      <audio
+        ref={audioAnchorRef}
+        src="/silence.wav"
+        loop
+        preload="auto"
+        playsInline
+        className="hidden"
+        aria-hidden="true"
+      />
+      <div
+        id="loop-yt-holder"
+        className="fixed bottom-0 right-0 w-16 h-16 opacity-[0.005] pointer-events-none overflow-hidden z-[-1]"
+        aria-hidden="true"
+      >
+        <div id="loop-yt-iframe" />
+      </div>
+    </>
   );
 }

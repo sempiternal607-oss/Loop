@@ -1,5 +1,5 @@
-const CACHE_NAME = 'loop-music-v3';
-const STATIC_ASSETS = ['/', '/manifest.webmanifest', '/icon.svg'];
+const CACHE_NAME = 'loop-music-v4';
+const STATIC_ASSETS = ['/', '/manifest.webmanifest', '/icon.svg', '/silence.wav'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
