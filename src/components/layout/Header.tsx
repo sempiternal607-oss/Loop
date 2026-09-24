@@ -57,7 +57,7 @@ export function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between gap-4 px-4 md:px-8 py-3 bg-[#090B12]/80 backdrop-blur-2xl border-b border-white/[0.06]">
+    <header className="sticky top-0 z-30 flex items-center justify-between gap-4 safe-top-header pb-3 bg-[#090B12]/80 backdrop-blur-2xl border-b border-white/[0.06] transition-all">
       {/* Mobile Logo Brand */}
       <Link href="/" className="md:hidden flex items-center gap-2.5 shrink-0">
         <div className="w-8 h-8 rounded-xl overflow-hidden shadow-[0_0_15px_-3px_rgba(16,185,129,0.3)] shrink-0">

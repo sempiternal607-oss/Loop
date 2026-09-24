@@ -43,6 +43,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       root.classList.add('dark');
       root.setAttribute('data-theme', 'dark');
     }
+    const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+    if (metaThemeColor) {
+      metaThemeColor.setAttribute('content', t === 'light' ? '#ffffff' : '#07080C');
+    }
   };
 
   const setTheme = (newTheme: Theme) => {

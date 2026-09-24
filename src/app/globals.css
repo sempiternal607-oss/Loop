@@ -22,6 +22,53 @@ body {
   transition: background-color 0.25s ease, color 0.25s ease;
 }
 
+/* ==========================================================================
+   iOS SAFE AREA INSET UTILITIES (Notch, Dynamic Island, Home Indicator)
+   ========================================================================== */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+}
+
+.safe-top-header {
+  padding-top: calc(env(safe-area-inset-top, 0px) + 0.75rem);
+  padding-left: max(1rem, env(safe-area-inset-left, 0px));
+  padding-right: max(1rem, env(safe-area-inset-right, 0px));
+}
+
+@media (min-width: 768px) {
+  .safe-top-header {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 0.75rem);
+    padding-left: max(2rem, env(safe-area-inset-left, 0px));
+    padding-right: max(2rem, env(safe-area-inset-right, 0px));
+  }
+}
+
+.safe-bottom-nav {
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.5rem);
+  padding-left: max(1rem, env(safe-area-inset-left, 0px));
+  padding-right: max(1rem, env(safe-area-inset-right, 0px));
+}
+
+.safe-bottom-player {
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 3.75rem);
+  left: max(0.625rem, env(safe-area-inset-left, 0px));
+  right: max(0.625rem, env(safe-area-inset-right, 0px));
+}
+
+.safe-bottom-toast {
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 6.25rem);
+}
+
+.safe-modal-p {
+  padding-top: calc(env(safe-area-inset-top, 0px) + 1rem);
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 1rem);
+  padding-left: max(1rem, env(safe-area-inset-left, 0px));
+  padding-right: max(1rem, env(safe-area-inset-right, 0px));
+}
+
 /* Custom sleek scrollbar */
 ::-webkit-scrollbar {
   width: 5px;

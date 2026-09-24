@@ -90,7 +90,7 @@ export function FullScreenNowPlaying() {
 
   return (
     <div
-      className={`fullscreen-player-modal fixed inset-0 z-50 w-full h-[100dvh] max-h-[100dvh] bg-[#07080C]/95 backdrop-blur-3xl flex flex-col justify-between px-5 py-4 sm:p-10 overflow-hidden select-none overscroll-none touch-manipulation ${
+      className={`fullscreen-player-modal fixed inset-0 z-50 w-full h-[100dvh] max-h-[100dvh] bg-[#07080C]/95 backdrop-blur-3xl flex flex-col justify-between px-5 pt-[calc(env(safe-area-inset-top,0px)+1rem)] pb-[calc(env(safe-area-inset-bottom,0px)+0.75rem)] sm:p-10 overflow-hidden select-none overscroll-none touch-manipulation ${
         isClosing ? 'animate-modal-out' : 'animate-modal-in'
       }`}
     >
@@ -254,7 +254,7 @@ export function FullScreenNowPlaying() {
       </div>
 
       {/* Bottom Actions: Synced Lyrics Card Preview & Queue Button */}
-      <div className="relative flex flex-col gap-2.5 w-full max-w-sm mx-auto z-10 mt-auto pb-[calc(env(safe-area-inset-bottom,0px)+0.25rem)] shrink-0">
+      <div className="relative flex flex-col gap-2.5 w-full max-w-sm mx-auto z-10 mt-auto shrink-0">
         {/* Karaoke Preview Card */}
         <div
           onClick={openLyrics}

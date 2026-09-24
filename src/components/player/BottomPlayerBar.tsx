@@ -58,7 +58,7 @@ export function BottomPlayerBar() {
   return (
     <>
       {/* ---------------- MOBILE FLOATING MINI PLAYER (Screen < md) ---------------- */}
-      <div className="md:hidden fixed bottom-14 left-2.5 right-2.5 z-30 mb-1 animate-mobile-mini-in">
+      <div className="md:hidden fixed safe-bottom-player z-30 mb-1 animate-mobile-mini-in">
         <div
           onClick={openFullScreen}
           className="mobile-player-bar bg-[#0E111C]/90 border border-white/[0.1] backdrop-blur-2xl rounded-2xl shadow-[0_12px_30px_rgba(0,0,0,0.8)] p-2.5 flex items-center justify-between gap-3 cursor-pointer relative overflow-hidden active:scale-[0.98] transition-all duration-200"

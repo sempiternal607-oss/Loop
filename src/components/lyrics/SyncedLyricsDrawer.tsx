@@ -81,7 +81,7 @@ export function SyncedLyricsDrawer() {
 
   return (
     <div
-      className={`lyrics-drawer fixed inset-0 z-50 bg-[#07080C]/95 backdrop-blur-3xl flex flex-col p-5 sm:p-10 overflow-hidden ${
+      className={`lyrics-drawer fixed inset-0 z-50 bg-[#07080C]/95 backdrop-blur-3xl flex flex-col px-5 pt-[calc(env(safe-area-inset-top,0px)+1.25rem)] pb-[calc(env(safe-area-inset-bottom,0px)+1.25rem)] sm:p-10 overflow-hidden ${
         isClosing ? 'animate-modal-out' : 'animate-modal-in'
       }`}
     >

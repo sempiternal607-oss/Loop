@@ -30,7 +30,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       {children}
       {toastMessage && (
         <div
-          className={`fixed bottom-24 md:bottom-28 left-1/2 z-50 pointer-events-none ${
+          className={`fixed safe-bottom-toast md:bottom-28 left-1/2 z-50 pointer-events-none ${
             isDismissing ? 'animate-fade-out' : 'animate-toast-in'
           }`}
         >

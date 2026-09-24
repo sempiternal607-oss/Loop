@@ -91,7 +91,7 @@ export function AlbumModal({ albumId, initialTitle, initialThumbnail, onClose }:
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 select-none ${
+      className={`fixed inset-0 z-50 flex items-center justify-center safe-modal-p sm:p-6 select-none ${
         isClosing ? 'animate-fade-out' : 'animate-fade-in'
       }`}
     >

@@ -53,7 +53,7 @@ export function QueueDrawer() {
 
   return (
     <div
-      className={`queue-drawer fixed inset-y-0 right-0 z-50 w-full max-w-md bg-[#07080C]/95 border-l border-white/[0.08] backdrop-blur-2xl shadow-2xl flex flex-col p-6 overflow-hidden ${
+      className={`queue-drawer fixed inset-y-0 right-0 z-50 w-full max-w-md bg-[#07080C]/95 border-l border-white/[0.08] backdrop-blur-2xl shadow-2xl flex flex-col px-6 pt-[calc(env(safe-area-inset-top,0px)+1.5rem)] pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)] overflow-hidden ${
         isClosing ? 'animate-drawer-out' : 'animate-drawer-in'
       }`}
     >

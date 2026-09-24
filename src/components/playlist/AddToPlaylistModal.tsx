@@ -64,7 +64,7 @@ export function AddToPlaylistModal() {
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md ${
+      className={`fixed inset-0 z-50 flex items-center justify-center safe-modal-p bg-black/70 backdrop-blur-md ${
         isClosing ? 'animate-fade-out' : 'animate-fade-in'
       }`}
       onClick={handleClose}

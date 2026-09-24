@@ -131,7 +131,7 @@ export function SharePlaylistModal() {
   const hasMultiple = songsWithThumbnails.length >= 4;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center safe-modal-p bg-black/80 backdrop-blur-md animate-fade-in">
       <div className="glass-panel w-full max-w-lg rounded-3xl p-6 sm:p-7 border border-white/[0.1] shadow-2xl flex flex-col gap-6 relative animate-scale-in max-h-[90vh] overflow-y-auto scrollbar-none">
         {/* Header */}
         <div className="flex items-center justify-between pb-2 border-b border-white/[0.08]">
