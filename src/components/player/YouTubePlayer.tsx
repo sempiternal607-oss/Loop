@@ -78,8 +78,28 @@ export function YouTubePlayer() {
   const skippedSegmentsRef = useRef<Set<string>>(new Set());
   const lastTrackIdRef = useRef<string | null>(null);
   const isChangingTrackRef = useRef<boolean>(false);
+  const trackChangeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const repeatModeRef = useRef(repeatMode);
   repeatModeRef.current = repeatMode;
+
+  const clearTrackChangeLock = useCallback(() => {
+    if (trackChangeTimeoutRef.current) {
+      clearTimeout(trackChangeTimeoutRef.current);
+      trackChangeTimeoutRef.current = null;
+    }
+    isChangingTrackRef.current = false;
+  }, []);
+
+  const setTrackChangeLock = useCallback((durationMs = 8000) => {
+    if (trackChangeTimeoutRef.current) {
+      clearTimeout(trackChangeTimeoutRef.current);
+    }
+    isChangingTrackRef.current = true;
+    trackChangeTimeoutRef.current = setTimeout(() => {
+      isChangingTrackRef.current = false;
+      trackChangeTimeoutRef.current = null;
+    }, durationMs);
+  }, []);
 
   const audioAnchorRef = useRef<HTMLAudioElement | null>(null);
 
@@ -94,7 +114,7 @@ export function YouTubePlayer() {
 
   const handleEnded = useCallback(() => {
     if (isChangingTrackRef.current) return;
-    isChangingTrackRef.current = true;
+    setTrackChangeLock(8000);
 
     if (repeatModeRef.current === 'one') {
       playerRef.current?.seekTo(0, true);
@@ -102,12 +122,12 @@ export function YouTubePlayer() {
       _setProgress(0);
       _setIsPlaying(true);
       setTimeout(() => {
-        isChangingTrackRef.current = false;
+        clearTrackChangeLock();
       }, 500);
     } else {
       _handleSongEnded();
     }
-  }, [_handleSongEnded, _setProgress, _setIsPlaying]);
+  }, [_handleSongEnded, _setProgress, _setIsPlaying, setTrackChangeLock, clearTrackChangeLock]);
 
   const handleEndedRef = useRef(handleEnded);
   handleEndedRef.current = handleEnded;
@@ -141,7 +161,7 @@ export function YouTubePlayer() {
           },
           onStateChange: (e) => {
             if (e.data === window.YT.PlayerState.PLAYING) {
-              isChangingTrackRef.current = false;
+              clearTrackChangeLock();
               _setIsPlaying(true);
               syncAudioAnchor(true);
             } else if (e.data === window.YT.PlayerState.PAUSED) {
@@ -185,7 +205,7 @@ export function YouTubePlayer() {
           onError: (e) => {
             console.warn('[YouTube Player] Error occurred:', e.data);
             showToast('Playback error, skipping to next track…');
-            isChangingTrackRef.current = true;
+            setTrackChangeLock(4000);
             nextRef.current();
           },
         },
@@ -207,9 +227,10 @@ export function YouTubePlayer() {
     }
 
     return () => {
+      clearTrackChangeLock();
       // Keep player alive for background audio
     };
-  }, [_setIsPlaying, volume, showToast, syncAudioAnchor]);
+  }, [_setIsPlaying, volume, showToast, syncAudioAnchor, clearTrackChangeLock, setTrackChangeLock]);
 
   // 2. Handle Song Change
   useEffect(() => {
@@ -218,7 +239,7 @@ export function YouTubePlayer() {
     if (lastTrackIdRef.current !== currentSong.videoId) {
       lastTrackIdRef.current = currentSong.videoId;
       skippedSegmentsRef.current.clear();
-      isChangingTrackRef.current = true;
+      setTrackChangeLock(8000);
 
       // Ensure mediaSession stays in 'playing' state during transition
       if ('mediaSession' in navigator) {
@@ -233,7 +254,7 @@ export function YouTubePlayer() {
       playerRef.current.playVideo();
       syncAudioAnchor(true);
     }
-  }, [currentSong, syncAudioAnchor]);
+  }, [currentSong, syncAudioAnchor, setTrackChangeLock]);
 
   // 3. Handle Play / Pause
   useEffect(() => {

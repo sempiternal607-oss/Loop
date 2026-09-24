@@ -360,6 +360,7 @@ export default function PlaylistDetailPage() {
               song={song}
               index={idx}
               playlistContext={playlist.songs}
+              options={{ bounded: true, playlistId: playlist.id }}
               onRemove={() => removeSongFromPlaylist(playlist.id, song.videoId)}
             />
           ))}

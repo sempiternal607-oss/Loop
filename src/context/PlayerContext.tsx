@@ -210,6 +210,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     setHistory((prev) => {
       const filtered = prev.filter((s) => s.videoId !== song.videoId);
       const updated = [song, ...filtered].slice(0, 50); // limit to 50
+      historyRef.current = updated;
       localStorage.setItem(STORAGE_KEYS.HIST, JSON.stringify(updated));
       return updated;
     });
@@ -268,8 +269,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }
   }, [loadLyricsOffset]);
 
-  // Fetch Auto Radio Queue
-  const fetchAutoRadioQueue = useCallback(async (song: Song): Promise<Song[]> => {
+  // Pure fetch for radio recommendation tracks (cached in radioTracksMapRef, no state mutation)
+  const fetchRadioTracks = useCallback(async (song: Song): Promise<Song[]> => {
+    if (radioTracksMapRef.current.has(song.videoId)) {
+      return radioTracksMapRef.current.get(song.videoId)!;
+    }
     try {
       const res = await fetch(`/api/next?videoId=${song.videoId}`);
       if (res.ok) {
@@ -277,21 +281,31 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         if (Array.isArray(data.queue) && data.queue.length > 0) {
           const songs = data.queue as Song[];
           radioTracksMapRef.current.set(song.videoId, songs);
-          setQueue((prevQueue) => {
-            const existingIds = new Set(prevQueue.map((s) => s.videoId));
-            const newSongs = songs.filter((s: Song) => !existingIds.has(s.videoId));
-            const updated = [...prevQueue, ...newSongs];
-            queueRef.current = updated;
-            return updated;
-          });
           return songs;
         }
       }
     } catch (e) {
-      console.error('Failed to fetch radio queue', e);
+      console.error('Failed to fetch radio tracks', e);
     }
     return [];
   }, []);
+
+  // Fetch and append radio songs to queue (only for unbounded continuous playback)
+  const appendAutoRadioQueue = useCallback(async (song: Song): Promise<Song[]> => {
+    if (isPlaylistBoundedRef.current) return [];
+    const songs = await fetchRadioTracks(song);
+    if (songs.length > 0) {
+      setQueue((prevQueue) => {
+        const existingIds = new Set(prevQueue.map((s) => s.videoId));
+        const newSongs = songs.filter((s: Song) => !existingIds.has(s.videoId));
+        if (newSongs.length === 0) return prevQueue;
+        const updated = [...prevQueue, ...newSongs];
+        queueRef.current = updated;
+        return updated;
+      });
+    }
+    return songs;
+  }, [fetchRadioTracks]);
 
   const playSong = useCallback(
     (song: Song, newQueue?: Song[], startIndex?: number, options?: { bounded?: boolean; playlistId?: string }) => {
@@ -302,19 +316,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         recordSkip(prevSong.videoId, prevSong.artist, prevProg);
       }
 
-      if (options?.bounded) {
-        setIsPlaylistBounded(true);
-        isPlaylistBoundedRef.current = true;
-        setActivePlaylistId(options.playlistId || null);
-        activePlaylistIdRef.current = options.playlistId || null;
-      } else {
-        setIsPlaylistBounded(false);
-        isPlaylistBoundedRef.current = false;
-        setActivePlaylistId(null);
-        activePlaylistIdRef.current = null;
-      }
+      const isBounded = Boolean(options?.bounded);
+      setIsPlaylistBounded(isBounded);
+      isPlaylistBoundedRef.current = isBounded;
+      setActivePlaylistId(options?.playlistId || null);
+      activePlaylistIdRef.current = options?.playlistId || null;
 
       setCurrentSong(song);
+      currentSongRef.current = song;
       setProgress(0);
       progressRef.current = 0;
       setDuration(song.duration || 0);
@@ -325,55 +334,79 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       const idx = startIndex !== undefined ? startIndex : targetQueue.findIndex((s) => s.videoId === song.videoId);
       const safeIdx = idx >= 0 ? idx : 0;
 
-      // If user specifically clicked a song inside an already active queue, keep queue position
-      if (startIndex !== undefined && startIndex > 0) {
-        setQueue(targetQueue);
-        setCurrentIndex(safeIdx);
-      } else if (isShuffleRef.current && targetQueue.length > 1) {
-        // Save original un-shuffled queue
-        originalQueueRef.current = [...targetQueue];
+      // Always save original un-shuffled queue snapshot for clean shuffle toggle restoration
+      originalQueueRef.current = [...targetQueue];
 
+      // If user specifically clicked a song inside an already active queue, keep queue position
+      if (startIndex !== undefined && startIndex >= 0) {
+        setQueue(targetQueue);
+        queueRef.current = targetQueue;
+        setCurrentIndex(safeIdx);
+        currentIndexRef.current = safeIdx;
+      } else if (isShuffleRef.current && targetQueue.length > 1) {
         // Head contains the selected song
         const head = [song];
         const otherSongs = targetQueue.filter((s) => s.videoId !== song.videoId);
 
-        // Immediate set so Playback Queue is responsive
-        setQueue([song, ...otherSongs]);
-        setCurrentIndex(0);
+        if (isBounded) {
+          // Bounded playlist: Strictly Fisher-Yates shuffle the remaining playlist songs (NO radio injection)
+          const shuffledOther = [...otherSongs];
+          for (let i = shuffledOther.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffledOther[i], shuffledOther[j]] = [shuffledOther[j], shuffledOther[i]];
+          }
+          const shuffledQ = [song, ...shuffledOther];
+          setQueue(shuffledQ);
+          queueRef.current = shuffledQ;
+          setCurrentIndex(0);
+          currentIndexRef.current = 0;
+        } else {
+          // Immediate set so Playback Queue is responsive
+          const initialQ = [song, ...otherSongs];
+          setQueue(initialQ);
+          queueRef.current = initialQ;
+          setCurrentIndex(0);
+          currentIndexRef.current = 0;
 
-        const session = smartShuffleService.initializeSession(song, targetQueue);
-        const context = buildShuffleContext({
-          currentSong: song,
-          session,
-          history: historyRef.current,
-          favorites: favoritesRef.current,
-          currentQueue: targetQueue,
-        });
-
-        // Smart-shuffle upcoming queue so Playback Queue shows optimal contextual order
-        smartShuffleService
-          .generateSmartQueueFromCandidates(context, otherSongs, fetchAutoRadioQueue)
-          .then((smartUpcoming) => {
-            if (isShuffleRef.current && currentSongRef.current?.videoId === song.videoId && smartUpcoming.length > 0) {
-              setQueue([song, ...smartUpcoming]);
-              setCurrentIndex(0);
-            }
+          const session = smartShuffleService.initializeSession(song, targetQueue);
+          const context = buildShuffleContext({
+            currentSong: song,
+            session,
+            history: historyRef.current,
+            favorites: favoritesRef.current,
+            currentQueue: targetQueue,
           });
+
+          // Smart-shuffle upcoming queue so Playback Queue shows optimal contextual order
+          smartShuffleService
+            .generateSmartQueueFromCandidates(context, otherSongs, fetchRadioTracks)
+            .then((smartUpcoming) => {
+              if (isShuffleRef.current && currentSongRef.current?.videoId === song.videoId && smartUpcoming.length > 0) {
+                const finalQ = [song, ...smartUpcoming];
+                setQueue(finalQ);
+                queueRef.current = finalQ;
+                setCurrentIndex(0);
+                currentIndexRef.current = 0;
+              }
+            });
+        }
       } else {
         setQueue(targetQueue);
+        queueRef.current = targetQueue;
         setCurrentIndex(safeIdx);
+        currentIndexRef.current = safeIdx;
       }
 
       // Always fetch similar radio songs in background for auto-continue & recommendations (only if not bounded)
-      if (!options?.bounded) {
-        fetchAutoRadioQueue(song);
+      if (!isBounded) {
+        appendAutoRadioQueue(song);
       }
 
       // Fetch auxiliary data
       fetchSponsorSegments(song.videoId);
       fetchLyrics(song);
     },
-    [pushHistory, fetchAutoRadioQueue, fetchSponsorSegments, fetchLyrics]
+    [pushHistory, appendAutoRadioQueue, fetchRadioTracks, fetchSponsorSegments, fetchLyrics]
   );
 
   const playPlaylist = useCallback(
@@ -485,8 +518,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       if (!nextSong) return;
 
       queueRef.current = targetQueue;
+      setQueue(targetQueue);
       setCurrentIndex(targetIdx);
+      currentIndexRef.current = targetIdx;
       setCurrentSong(nextSong);
+      currentSongRef.current = nextSong;
       setProgress(0);
       progressRef.current = 0;
       setDuration(nextSong.duration || 0);
@@ -506,11 +542,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
             favorites: favoritesRef.current,
             currentQueue: targetQueue,
           });
-          smartShuffleService.generateSmartUpcoming(context, fetchAutoRadioQueue).then((moreSongs) => {
+          smartShuffleService.generateSmartUpcoming(context, fetchRadioTracks).then((moreSongs) => {
             if (moreSongs.length > 0) {
               setQueue((prevQ) => {
                 const existingIds = new Set(prevQ.map((s) => s.videoId));
                 const fresh = moreSongs.filter((s) => !existingIds.has(s.videoId));
+                if (fresh.length === 0) return prevQ;
                 const updated = [...prevQ, ...fresh];
                 queueRef.current = updated;
                 return updated;
@@ -518,7 +555,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
             }
           });
         } else {
-          fetchAutoRadioQueue(nextSong);
+          appendAutoRadioQueue(nextSong);
         }
       }
     };
@@ -545,8 +582,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
         if (freshCached.length > 0) {
           const updatedQ = [...q, ...freshCached];
-          queueRef.current = updatedQ;
-          setQueue(updatedQ);
           playAtIndex(q.length, updatedQ);
           return;
         }
@@ -561,15 +596,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
             favorites: favoritesRef.current,
             currentQueue: q,
           });
-          smartShuffleService.generateSmartUpcoming(context, fetchAutoRadioQueue).then((moreSongs) => {
+          smartShuffleService.generateSmartUpcoming(context, fetchRadioTracks).then((moreSongs) => {
             if (moreSongs.length > 0) {
               const playedIdsSet = new Set(queueRef.current.map((s) => s.videoId));
               const fresh = moreSongs.filter((s) => !playedIdsSet.has(s.videoId));
               if (fresh.length > 0) {
+                const startIndex = queueRef.current.length;
                 const updatedQ = [...queueRef.current, ...fresh];
-                queueRef.current = updatedQ;
-                setQueue(updatedQ);
-                playAtIndex(queueRef.current.length - fresh.length, updatedQ);
+                playAtIndex(startIndex, updatedQ);
                 return;
               }
             }
@@ -581,15 +615,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
             }
           });
         } else {
-          fetchAutoRadioQueue(curSong).then((moreSongs) => {
+          fetchRadioTracks(curSong).then((moreSongs) => {
             if (moreSongs.length > 0) {
               const playedIdsSet = new Set(queueRef.current.map((s) => s.videoId));
               const fresh = moreSongs.filter((s) => !playedIdsSet.has(s.videoId));
               if (fresh.length > 0) {
+                const startIndex = queueRef.current.length;
                 const updatedQ = [...queueRef.current, ...fresh];
-                queueRef.current = updatedQ;
-                setQueue(updatedQ);
-                playAtIndex(queueRef.current.length - fresh.length, updatedQ);
+                playAtIndex(startIndex, updatedQ);
                 return;
               }
             }
@@ -605,7 +638,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         setIsPlaying(false);
       }
     }
-  }, [pushHistory, fetchSponsorSegments, fetchLyrics, fetchAutoRadioQueue, showToast]);
+  }, [pushHistory, fetchSponsorSegments, fetchLyrics, fetchRadioTracks, appendAutoRadioQueue, showToast]);
 
   const prev = useCallback(() => {
     if (progressRef.current > 3) {
@@ -617,9 +650,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const curIdx = currentIndexRef.current;
 
     if (curIdx > 0 && curIdx - 1 < q.length) {
-      const prevSong = q[curIdx - 1];
-      setCurrentIndex(curIdx - 1);
+      const targetIdx = curIdx - 1;
+      const prevSong = q[targetIdx];
+      setCurrentIndex(targetIdx);
+      currentIndexRef.current = targetIdx;
       setCurrentSong(prevSong);
+      currentSongRef.current = prevSong;
       setProgress(0);
       progressRef.current = 0;
       setDuration(prevSong.duration || 0);
@@ -641,6 +677,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       } else {
         copy.push({ ...song, _userAdded: true });
       }
+      queueRef.current = copy;
       return copy;
     });
     showToast(playNext ? 'Playing next' : 'Added to queue');
@@ -648,9 +685,16 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const removeFromQueue = useCallback((index: number) => {
     setQueue((prevQ) => {
-      if (index === currentIndexRef.current) return prevQ;
+      const curIdx = currentIndexRef.current;
+      if (index === curIdx) return prevQ;
       const copy = [...prevQ];
       copy.splice(index, 1);
+      queueRef.current = copy;
+      if (index < curIdx) {
+        const newIdx = curIdx - 1;
+        setCurrentIndex(newIdx);
+        currentIndexRef.current = newIdx;
+      }
       return copy;
     });
     showToast('Removed from queue');
@@ -667,14 +711,17 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const toggleShuffle = useCallback(() => {
     setIsShuffle((prev) => {
       const nextVal = !prev;
+      isShuffleRef.current = nextVal;
       showToast(nextVal ? 'Shuffle on' : 'Shuffle off');
       const curSong = currentSongRef.current;
       const curQ = queueRef.current;
       const curIdx = currentIndexRef.current;
 
       if (nextVal) {
-        // Save original un-shuffled queue snapshot
-        originalQueueRef.current = [...curQ];
+        // Save original un-shuffled queue snapshot if not yet saved
+        if (originalQueueRef.current.length === 0) {
+          originalQueueRef.current = [...curQ];
+        }
 
         if (curSong) {
           const head = curQ.slice(0, curIdx + 1);
@@ -687,7 +734,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
               const j = Math.floor(Math.random() * (i + 1));
               [shuffledUpcoming[i], shuffledUpcoming[j]] = [shuffledUpcoming[j], shuffledUpcoming[i]];
             }
-            setQueue([...head, ...shuffledUpcoming]);
+            const newQ = [...head, ...shuffledUpcoming];
+            queueRef.current = newQ;
+            setQueue(newQ);
           } else {
             const session = smartShuffleService.initializeSession(curSong, curQ);
             const context = buildShuffleContext({
@@ -700,10 +749,17 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
             // Smart-shuffle upcoming queue so Playback Queue is immediately optimized
             smartShuffleService
-              .generateSmartQueueFromCandidates(context, upcoming, fetchAutoRadioQueue)
+              .generateSmartQueueFromCandidates(context, upcoming, fetchRadioTracks)
               .then((smartUpcoming) => {
                 if (smartUpcoming.length > 0 && isShuffleRef.current) {
-                  setQueue([...head, ...smartUpcoming]);
+                  const currentCurIdx = currentIndexRef.current;
+                  const currentCurSong = currentSongRef.current;
+                  if (currentCurSong?.videoId === curSong.videoId) {
+                    const freshHead = queueRef.current.slice(0, currentCurIdx + 1);
+                    const freshQ = [...freshHead, ...smartUpcoming];
+                    queueRef.current = freshQ;
+                    setQueue(freshQ);
+                  }
                 }
               });
           }
@@ -715,6 +771,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           const restored = [...originalQueueRef.current];
           const existIdx = restored.findIndex((s) => s.videoId === curSong.videoId);
           if (existIdx !== -1) {
+            queueRef.current = restored;
+            currentIndexRef.current = existIdx;
             setQueue(restored);
             setCurrentIndex(existIdx);
           }
@@ -722,7 +780,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       }
       return nextVal;
     });
-  }, [showToast, fetchAutoRadioQueue]);
+  }, [showToast, fetchRadioTracks]);
 
   // Drawer toggles
   const toggleLyrics = useCallback(() => setIsLyricsOpen((p) => !p), []);

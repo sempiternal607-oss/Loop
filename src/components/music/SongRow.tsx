@@ -12,10 +12,11 @@ interface SongRowProps {
   song: Song;
   index?: number;
   playlistContext?: Song[];
+  options?: { bounded?: boolean; playlistId?: string };
   onRemove?: () => void;
 }
 
-export function SongRow({ song, index, playlistContext, onRemove }: SongRowProps) {
+export function SongRow({ song, index, playlistContext, options, onRemove }: SongRowProps) {
   const router = useRouter();
   const { playSong, currentSong, isPlaying, togglePlay, toggleFavorite, isFavorite, addToQueue } = usePlayer();
   const { openAddToPlaylistModal } = usePlaylist();
@@ -27,7 +28,7 @@ export function SongRow({ song, index, playlistContext, onRemove }: SongRowProps
     if (isCurrent) {
       togglePlay();
     } else {
-      playSong(song, playlistContext, index);
+      playSong(song, playlistContext, index, options);
     }
   };
 
