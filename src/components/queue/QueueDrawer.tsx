@@ -12,6 +12,7 @@ export function QueueDrawer() {
     currentIndex,
     isQueueOpen,
     isPlaylistBounded,
+    activePlaylistId,
     closeQueue,
     playSong,
     removeFromQueue,
@@ -128,7 +129,9 @@ export function QueueDrawer() {
 
           {upcomingQueue.length === 0 ? (
             <div className="text-xs text-slate-400 py-8 text-center glass-panel rounded-2xl p-4 border border-white/[0.06]">
-              Queue is empty. Similar songs will load automatically via smart shuffle!
+              {isPlaylistBounded
+                ? 'Akhir dari playlist tercapai. Pemutaran akan berhenti di sini.'
+                : 'Antrean kosong. Lagu serupa akan dimuat otomatis via smart shuffle!'}
             </div>
           ) : (
             <div className="flex flex-col gap-1.5">
@@ -140,7 +143,12 @@ export function QueueDrawer() {
                     className="flex items-center justify-between gap-3 p-2.5 rounded-xl hover:bg-white/[0.04] border border-transparent hover:border-white/[0.06] transition-all group"
                   >
                     <div
-                      onClick={() => playSong(song, queue, absoluteIndex)}
+                      onClick={() =>
+                        playSong(song, queue, absoluteIndex, {
+                          bounded: isPlaylistBounded,
+                          playlistId: activePlaylistId || undefined,
+                        })
+                      }
                       className="flex items-center gap-3 overflow-hidden flex-1 cursor-pointer"
                     >
                       <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-slate-900 shrink-0 border border-white/[0.06]">

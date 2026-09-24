@@ -23,7 +23,7 @@ function ShareReceiverContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { importPlaylist } = usePlaylist();
-  const { playPlaylist } = usePlayer();
+  const { playPlaylist, playSong } = usePlayer();
 
   const [isLoading, setIsLoading] = useState(true);
   const [sharedData, setSharedData] = useState<SharedPlaylistData | null>(null);
@@ -230,7 +230,13 @@ function ShareReceiverContent() {
           {sharedData.songs.map((song, index) => (
             <div
               key={`${song.videoId}-${index}`}
-              className="flex items-center justify-between py-2.5 px-3 rounded-2xl hover:bg-white/[0.04] transition group"
+              onClick={() =>
+                playSong(song, sharedData.songs, index, {
+                  bounded: true,
+                  playlistId: 'shared-preview',
+                })
+              }
+              className="flex items-center justify-between py-2.5 px-3 rounded-2xl hover:bg-white/[0.04] transition group cursor-pointer"
             >
               <div className="flex items-center gap-3 min-w-0">
                 <span className="w-6 text-xs text-slate-500 text-center font-mono">

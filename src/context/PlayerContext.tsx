@@ -316,11 +316,24 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         recordSkip(prevSong.videoId, prevSong.artist, prevProg);
       }
 
-      const isBounded = Boolean(options?.bounded);
+      const isQueueActive = Boolean(newQueue && newQueue === queueRef.current);
+      const isBounded =
+        options?.bounded !== undefined
+          ? Boolean(options.bounded)
+          : isQueueActive
+          ? isPlaylistBoundedRef.current
+          : false;
+      const playlistId =
+        options?.playlistId !== undefined
+          ? options.playlistId
+          : isQueueActive
+          ? activePlaylistIdRef.current
+          : null;
+
       setIsPlaylistBounded(isBounded);
       isPlaylistBoundedRef.current = isBounded;
-      setActivePlaylistId(options?.playlistId || null);
-      activePlaylistIdRef.current = options?.playlistId || null;
+      setActivePlaylistId(playlistId || null);
+      activePlaylistIdRef.current = playlistId || null;
 
       setCurrentSong(song);
       currentSongRef.current = song;
@@ -331,14 +344,19 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       pushHistory(song);
 
       const targetQueue = newQueue && newQueue.length > 0 ? newQueue : [song];
-      const idx = startIndex !== undefined ? startIndex : targetQueue.findIndex((s) => s.videoId === song.videoId);
-      const safeIdx = idx >= 0 ? idx : 0;
+      const foundIdx = targetQueue.findIndex((s) => s.videoId === song.videoId);
+      const safeIdx =
+        startIndex !== undefined && startIndex >= 0 && targetQueue[startIndex]?.videoId === song.videoId
+          ? startIndex
+          : foundIdx >= 0
+          ? foundIdx
+          : 0;
 
       // Always save original un-shuffled queue snapshot for clean shuffle toggle restoration
       originalQueueRef.current = [...targetQueue];
 
-      // If user specifically clicked a song inside an already active queue, keep queue position
-      if (startIndex !== undefined && startIndex >= 0) {
+      // If user specifically clicked a song inside an already active queue, keep existing queue position
+      if (isQueueActive) {
         setQueue(targetQueue);
         queueRef.current = targetQueue;
         setCurrentIndex(safeIdx);
@@ -571,6 +589,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     } else if (isPlaylistBoundedRef.current) {
       // Reached the end of the bounded playlist! Stop playback cleanly without radio injection
       setIsPlaying(false);
+      setProgress(0);
+      progressRef.current = 0;
+      seek(0);
       showToast('Finished playlist');
     } else {
       // Reached the end of the Playback Queue: fetch more smart similar songs and append to queue

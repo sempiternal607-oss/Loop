@@ -354,16 +354,19 @@ export default function PlaylistDetailPage() {
         </div>
       ) : (
         <div className="glass-panel rounded-3xl p-3 sm:p-4 border border-white/[0.08] flex flex-col gap-1">
-          {filteredSongs.map((song, idx) => (
-            <SongRow
-              key={`${song.videoId}-${idx}`}
-              song={song}
-              index={idx}
-              playlistContext={playlist.songs}
-              options={{ bounded: true, playlistId: playlist.id }}
-              onRemove={() => removeSongFromPlaylist(playlist.id, song.videoId)}
-            />
-          ))}
+          {filteredSongs.map((song, idx) => {
+            const trueIndex = playlist.songs.findIndex((s) => s.videoId === song.videoId);
+            return (
+              <SongRow
+                key={`${song.videoId}-${idx}`}
+                song={song}
+                index={trueIndex >= 0 ? trueIndex : idx}
+                playlistContext={playlist.songs}
+                options={{ bounded: true, playlistId: playlist.id }}
+                onRemove={() => removeSongFromPlaylist(playlist.id, song.videoId)}
+              />
+            );
+          })}
         </div>
       )}
 
