@@ -5,6 +5,7 @@ import {
   ShuffleCandidate,
 } from './types';
 import { createShuffleSession, normalizeArtistName } from './tasteProfile';
+import { isNonMusicContent } from '@/lib/ytmusic';
 import { getCandidateSongs } from './candidates';
 import { scoreCandidate } from './scoring';
 import { selectWeightedCandidates } from './selection';
@@ -77,14 +78,20 @@ export class SmartShuffleService {
   /**
    * Smartly re-orders a pool of candidate songs (e.g. upcoming queue)
    * using the smart contextual shuffle scoring and weighted selection.
-   * If candidate pool has fewer songs than desired, supplements with radio tracks.
+   *
+   * Bounded mode (isBounded: true):
+   *  - NEVER injects radio tracks: only user's own songs are used
+   *  - Long songs (>15min, e.g. mixes/live compilations in a playlist) are kept
+   *  - ALL candidate songs are returned — nothing from the user's playlist is dropped
    */
   public async generateSmartQueueFromCandidates(
     context: ShuffleContext,
     candidateSongs: Song[],
-    fetchRadioFn?: (song: Song) => Promise<Song[]>
+    fetchRadioFn?: (song: Song) => Promise<Song[]>,
+    options?: { isBounded?: boolean }
   ): Promise<Song[]> {
     const { currentSong } = context;
+    const isBounded = options?.isBounded ?? false;
     const uniqueMap = new Map<string, Song>();
 
     // 1. Add provided candidate songs
@@ -94,9 +101,9 @@ export class SmartShuffleService {
       }
     }
 
-    // 2. If candidate count is low (< 10), fetch similar radio tracks to enrich the queue
+    // 2. Radio enrichment — unbounded only, and only when the user's own pool is small
     const radioIndexMap = new Map<string, number>();
-    if (uniqueMap.size < 10 && fetchRadioFn) {
+    if (!isBounded && uniqueMap.size < 10 && fetchRadioFn) {
       try {
         const radioSongs = await fetchRadioFn(currentSong);
         radioSongs.forEach((s, idx) => {
@@ -112,11 +119,21 @@ export class SmartShuffleService {
       }
     }
 
-    // 3. Filter non-music or excessively long compilations
+    // 3. Content filters
+    //    - Bounded: keep every user song, no duration cap
+    //    - Unbounded: drop non-music content and >15min compilations
     const validSongs: Song[] = [];
     for (const song of uniqueMap.values()) {
-      const dur = song.duration || 0;
-      if (dur > 900) continue;
+      if (!isBounded) {
+        const dur = song.duration || 0;
+        if (dur > 900) continue;
+        if (
+          typeof window !== 'undefined' &&
+          isNonMusicContent(song.title, song.artist, undefined, dur)
+        ) {
+          continue;
+        }
+      }
       validSongs.push(song);
     }
 
@@ -129,8 +146,10 @@ export class SmartShuffleService {
       scoreCandidate(cand, context, radioIndexMap.get(cand.videoId))
     );
 
-    // 5. Select and order candidates using weighted probabilistic sampling
-    const countToSelect = Math.min(validSongs.length, 50);
+    // 5. Select and order candidates using weighted probabilistic sampling.
+    //    Bounded mode must return every user song exactly once (a real shuffle of
+    //    the playlist); unbounded mode caps the queue as before.
+    const countToSelect = isBounded ? validSongs.length : Math.min(validSongs.length, 50);
     const selected = selectWeightedCandidates(
       scoredCandidates,
       countToSelect,

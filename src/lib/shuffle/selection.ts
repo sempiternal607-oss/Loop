@@ -44,10 +44,10 @@ export function selectWeightedCandidates(
     return [];
   }
 
-  if (candidates.length <= count) {
-    // Small candidate pool: sort by finalScore descending and return
-    return [...candidates].sort((a, b) => b.finalScore - a.finalScore);
-  }
+  // NOTE: no small-pool shortcut here. When count === pool size (bounded playlist
+  // shuffle) a sorted return would be fully deterministic — the same playlist would
+  // always shuffle into the exact same order. Weighted sampling below still covers
+  // every song exactly once while keeping score-weighted randomness.
 
   // Quality gate: prune out clashing/low-scoring outliers (< 0.25) when viable candidates are available
   const viable = candidates.filter((c) => c.finalScore >= 0.25);

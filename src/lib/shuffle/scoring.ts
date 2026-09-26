@@ -138,8 +138,13 @@ export function calculateSimilarityScore(
   }
 
   // 2. Radio correlation confidence (from YouTube Music's RDAMVM ranking)
+  // When there is no radio signal (e.g. bounded playlist shuffle), all candidates
+  // share the same neutral baseline — so this component carries NO information.
+  // calculateSimilarityScore reweights itself in that case so it does not drown
+  // out the language/artist/genre signals that actually matter for playlists.
+  const hasRadioSignal = typeof radioIndex === 'number' && radioIndex >= 0;
   let radioCloseness = 0.35; // Baseline if not in radio
-  if (typeof radioIndex === 'number' && radioIndex >= 0) {
+  if (hasRadioSignal) {
     // Top recommendation has radioCloseness = 1.0, decaying gradually
     radioCloseness = Math.max(0.3, 1.0 - (radioIndex / 40) * 0.7);
   }
@@ -173,14 +178,22 @@ export function calculateSimilarityScore(
   else if (isCurrEdm && isCandEdm) acousticMatch = 1.0;
   else if (isCurrEdm && isCandAcoustic) acousticMatch = 0.15;
 
-  // Weighted combination for similarity (Sum of weights = 1.0)
-  // Weights: radioCloseness (0.35), languageMatch (0.25), artistSimilarity (0.15), genreSimilarity (0.15), acousticMatch (0.10)
+  // Weighted combination for similarity. When a radio signal exists the ordering
+  // from YouTube Music is a strong relevance signal (weight 0.35). Without it
+  // (playlist/queue shuffling), that signal is constant noise, so its weight is
+  // redistributed to language (cultural coherence) and artist proximity.
+  const wRadio = hasRadioSignal ? 0.35 : 0.0;
+  const wLang = hasRadioSignal ? 0.25 : 0.40;
+  const wArtist = hasRadioSignal ? 0.15 : 0.30;
+  const wGenre = 0.15;
+  const wAcoustic = hasRadioSignal ? 0.10 : 0.15;
+
   const score =
-    radioCloseness * 0.35 +
-    languageMatch * 0.25 +
-    artistSimilarity * 0.15 +
-    genreSimilarity * 0.15 +
-    acousticMatch * 0.10;
+    radioCloseness * wRadio +
+    languageMatch * wLang +
+    artistSimilarity * wArtist +
+    genreSimilarity * wGenre +
+    acousticMatch * wAcoustic;
 
   return {
     score: Math.min(1.0, Math.max(0.0, score)),
@@ -206,7 +219,7 @@ export function calculatePersonalizationScore(
   const candArtistNorm = normalizeArtistName(candidate.artist);
 
   // Base neutral score
-  let baseScore = 0.50;
+  const baseScore = 0.50;
 
   // 1. User Liked / Favorite Boost (+0.35)
   let userLikedBoost = 0;

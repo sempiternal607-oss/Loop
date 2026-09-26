@@ -362,22 +362,37 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         setCurrentIndex(safeIdx);
         currentIndexRef.current = safeIdx;
       } else if (isShuffleRef.current && targetQueue.length > 1) {
-        // Head contains the selected song
-        const head = [song];
         const otherSongs = targetQueue.filter((s) => s.videoId !== song.videoId);
 
         if (isBounded) {
-          // Bounded playlist: Strictly Fisher-Yates shuffle the remaining playlist songs (NO radio injection)
-          const shuffledOther = [...otherSongs];
-          for (let i = shuffledOther.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [shuffledOther[i], shuffledOther[j]] = [shuffledOther[j], shuffledOther[i]];
-          }
-          const shuffledQ = [song, ...shuffledOther];
-          setQueue(shuffledQ);
-          queueRef.current = shuffledQ;
+          // Bounded playlist: smart-shuffle ONLY the user's own playlist songs
+          // (NO radio injection). Songs are ordered contextually by relevance to the
+          // current song + personal taste, with artist/genre fatigue avoidance.
+          const initialQ = [song, ...otherSongs];
+          setQueue(initialQ);
+          queueRef.current = initialQ;
           setCurrentIndex(0);
           currentIndexRef.current = 0;
+
+          const session = smartShuffleService.initializeSession(song, targetQueue);
+          const context = buildShuffleContext({
+            currentSong: song,
+            session,
+            history: historyRef.current,
+            favorites: favoritesRef.current,
+            currentQueue: targetQueue,
+          });
+          smartShuffleService
+            .generateSmartQueueFromCandidates(context, otherSongs, fetchRadioTracks, { isBounded: true })
+            .then((smartUpcoming) => {
+              if (isShuffleRef.current && currentSongRef.current?.videoId === song.videoId && smartUpcoming.length > 0) {
+                const finalQ = [song, ...smartUpcoming];
+                setQueue(finalQ);
+                queueRef.current = finalQ;
+                setCurrentIndex(0);
+                currentIndexRef.current = 0;
+              }
+            });
         } else {
           // Immediate set so Playback Queue is responsive
           const initialQ = [song, ...otherSongs];
@@ -450,12 +465,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         const startSong = allSongs[chosenIndex];
         const otherSongs = allSongs.filter((_, idx) => idx !== chosenIndex);
 
-        // Fisher-Yates shuffle exclusively within playlist songs
-        for (let i = otherSongs.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [otherSongs[i], otherSongs[j]] = [otherSongs[j], otherSongs[i]];
-        }
-
+        // Smart bounded shuffle: order the user's own playlist songs contextually
+        // (relevance to the starting song + personal taste). No radio injection —
+        // every playlist song is kept and played exactly once.
         const shuffledQueue = [startSong, ...otherSongs];
         originalQueueRef.current = [...playlist.songs];
 
@@ -475,6 +487,27 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         pushHistory(startSong);
         fetchSponsorSegments(startSong.videoId);
         fetchLyrics(startSong);
+
+        const session = smartShuffleService.initializeSession(startSong, allSongs);
+        const context = buildShuffleContext({
+          currentSong: startSong,
+          session,
+          history: historyRef.current,
+          favorites: favoritesRef.current,
+          currentQueue: allSongs,
+        });
+        smartShuffleService
+          .generateSmartQueueFromCandidates(context, otherSongs, fetchRadioTracks, { isBounded: true })
+          .then((smartUpcoming) => {
+            if (isShuffleRef.current && currentSongRef.current?.videoId === startSong.videoId && smartUpcoming.length > 0) {
+              const finalQ = [startSong, ...smartUpcoming];
+              setQueue(finalQ);
+              queueRef.current = finalQ;
+              setCurrentIndex(0);
+              currentIndexRef.current = 0;
+            }
+          });
+
         showToast(`Shuffling "${playlist.title}" (${playlist.songs.length} tracks)`);
       } else {
         const startIdx =
@@ -503,7 +536,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         showToast(`Playing "${playlist.title}"`);
       }
     },
-    [showToast, pushHistory, fetchSponsorSegments, fetchLyrics]
+    [showToast, pushHistory, fetchSponsorSegments, fetchLyrics, fetchRadioTracks]
   );
 
   const pause = useCallback(() => setIsPlaying(false), []);
@@ -587,12 +620,48 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     } else if (rMode === 'all') {
       playAtIndex(0, q);
     } else if (isPlaylistBoundedRef.current) {
-      // Reached the end of the bounded playlist! Stop playback cleanly without radio injection
-      setIsPlaying(false);
-      setProgress(0);
-      progressRef.current = 0;
-      seek(0);
-      showToast('Finished playlist');
+      // Reached the end of the bounded playlist. With shuffle ON, keep the music
+      // going: continue seamlessly from radio seeded on the last song. The playlist
+      // itself was never diluted — radio only enters once every playlist song played.
+      if (curSong && isShuffleRef.current) {
+        const session = smartShuffleService.getSession() || smartShuffleService.initializeSession(curSong, q);
+        const context = buildShuffleContext({
+          currentSong: curSong,
+          session,
+          history: historyRef.current,
+          favorites: favoritesRef.current,
+          currentQueue: q,
+        });
+        smartShuffleService.generateSmartUpcoming(context, fetchRadioTracks).then((moreSongs) => {
+          const seen = new Set(queueRef.current.map((s) => s.videoId));
+          const fresh: Song[] = [];
+          for (const s of moreSongs) {
+            if (s && s.videoId && !seen.has(s.videoId) && s.videoId !== curSong.videoId) {
+              seen.add(s.videoId);
+              fresh.push(s);
+            }
+          }
+          if (fresh.length > 0) {
+            const startIndex = queueRef.current.length;
+            const updatedQ = [...queueRef.current, ...fresh];
+            playAtIndex(startIndex, updatedQ);
+            return;
+          }
+          // Nothing fresh from radio: stop playback cleanly
+          setIsPlaying(false);
+          setProgress(0);
+          progressRef.current = 0;
+          seek(0);
+          showToast('Finished playlist');
+        });
+      } else {
+        // Stop playback cleanly without radio injection
+        setIsPlaying(false);
+        setProgress(0);
+        progressRef.current = 0;
+        seek(0);
+        showToast('Finished playlist');
+      }
     } else {
       // Reached the end of the Playback Queue: fetch more smart similar songs and append to queue
       if (curSong) {
@@ -749,15 +818,35 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           const upcoming = curQ.slice(curIdx + 1);
 
           if (isPlaylistBoundedRef.current) {
-            // Strictly Fisher-Yates shuffle the remaining playlist songs
-            const shuffledUpcoming = [...upcoming];
-            for (let i = shuffledUpcoming.length - 1; i > 0; i--) {
-              const j = Math.floor(Math.random() * (i + 1));
-              [shuffledUpcoming[i], shuffledUpcoming[j]] = [shuffledUpcoming[j], shuffledUpcoming[i]];
-            }
-            const newQ = [...head, ...shuffledUpcoming];
+            // Smart bounded shuffle: reorder only the remaining playlist songs
+            // (NO radio injection). Falls back to the current order instantly;
+            // the contextual ordering replaces it once scoring completes.
+            const newQ = [...head, ...upcoming];
             queueRef.current = newQ;
             setQueue(newQ);
+
+            const session = smartShuffleService.initializeSession(curSong, curQ);
+            const context = buildShuffleContext({
+              currentSong: curSong,
+              session,
+              history: historyRef.current,
+              favorites: favoritesRef.current,
+              currentQueue: curQ,
+            });
+            smartShuffleService
+              .generateSmartQueueFromCandidates(context, upcoming, fetchRadioTracks, { isBounded: true })
+              .then((smartUpcoming) => {
+                if (smartUpcoming.length > 0 && isShuffleRef.current) {
+                  const currentCurIdx = currentIndexRef.current;
+                  const currentCurSong = currentSongRef.current;
+                  if (currentCurSong?.videoId === curSong.videoId) {
+                    const freshHead = queueRef.current.slice(0, currentCurIdx + 1);
+                    const freshQ = [...freshHead, ...smartUpcoming];
+                    queueRef.current = freshQ;
+                    setQueue(freshQ);
+                  }
+                }
+              });
           } else {
             const session = smartShuffleService.initializeSession(curSong, curQ);
             const context = buildShuffleContext({
