@@ -80,3 +80,64 @@ export function selectWeightedCandidates(
 
   return selected;
 }
+
+/**
+ * Builds a Spotify-style discovery mix from a scored candidate pool.
+ *
+ * Radio candidates (YouTube Music recommendations seeded from the currently
+ * playing song) form the MAJORITY of the mix, interleaved with a minority of
+ * context tracks (queue / search results / playlist leftovers). This mirrors
+ * Spotify smart shuffle: the queue is dominated by songs SIMILAR to what is
+ * playing (so "Selfless by The Strokes" leads to similar indie rock, not
+ * twenty other songs titled "Selfless"), while the user's own songs are
+ * still woven in.
+ */
+export function selectDiscoveryMix(
+  radioCandidates: ShuffleCandidate[],
+  contextCandidates: ShuffleCandidate[],
+  count: number,
+  temperature: number = 0.65,
+  radioShare: number = 0.75
+): ShuffleCandidate[] {
+  if (count <= 0) return [];
+
+  // Degenerate pools degrade to plain weighted selection
+  if (radioCandidates.length === 0) {
+    return selectWeightedCandidates(contextCandidates, count, temperature);
+  }
+  if (contextCandidates.length === 0) {
+    return selectWeightedCandidates(radioCandidates, count, temperature);
+  }
+
+  // Quota split. If the radio pool is smaller than its share, the unused
+  // quota flows to context, and vice versa via the final fill-up.
+  const radioQuota = Math.min(Math.round(count * radioShare), radioCandidates.length);
+  const contextQuota = Math.min(count - radioQuota, contextCandidates.length);
+
+  const radioPicks = selectWeightedCandidates(radioCandidates, radioQuota, temperature);
+  const contextPicks = selectWeightedCandidates(contextCandidates, contextQuota, temperature);
+
+  // Interleave radio / context so the user's own songs stay evenly woven in
+  const mixed: ShuffleCandidate[] = [];
+  const maxLen = Math.max(radioPicks.length, contextPicks.length);
+  for (let i = 0; i < maxLen; i++) {
+    if (i < radioPicks.length) mixed.push(radioPicks[i]);
+    if (i < contextPicks.length) mixed.push(contextPicks[i]);
+  }
+
+  // If context ran out before count was reached, top up from leftover radio
+  if (mixed.length < count) {
+    const pickedIds = new Set(mixed.map((c) => c.song.videoId));
+    const radioLeftovers = radioCandidates.filter(
+      (c) => !pickedIds.has(c.song.videoId)
+    );
+    const topUp = selectWeightedCandidates(
+      radioLeftovers,
+      count - mixed.length,
+      temperature
+    );
+    mixed.push(...topUp);
+  }
+
+  return mixed;
+}

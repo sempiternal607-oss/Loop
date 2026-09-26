@@ -430,8 +430,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         currentIndexRef.current = safeIdx;
       }
 
-      // Always fetch similar radio songs in background for auto-continue & recommendations (only if not bounded)
-      if (!isBounded) {
+      // Auto-fetch radio for continuous playback (unbounded, shuffle OFF only).
+      // With shuffle ON, the discovery mix in generateSmartQueueFromCandidates
+      // already seeds the queue with radio tracks — appending the raw radio
+      // here would duplicate them and pollute the curated mix.
+      if (!isBounded && !isShuffleRef.current) {
         appendAutoRadioQueue(song);
       }
 

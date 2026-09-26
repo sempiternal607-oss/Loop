@@ -1,4 +1,4 @@
-import { Song, ShuffleContext } from './types';
+import { Song, ShuffleContext, ShuffleCandidate } from './types';
 import { isNonMusicContent } from '@/lib/ytmusic';
 
 export interface CandidatePoolResult {
@@ -116,4 +116,26 @@ export async function getCandidateSongs(
     candidates: filtered,
     radioIndexMap,
   };
+}
+
+/**
+ * Splits a scored candidate list into radio candidates (YouTube Music
+ * recommendations seeded from the current song) and context candidates
+ * (the user's own queue / search results / playlist leftovers).
+ */
+export function partitionBySource(
+  scored: ShuffleCandidate[]
+): { radioCandidates: ShuffleCandidate[]; contextCandidates: ShuffleCandidate[] } {
+  const radioCandidates: ShuffleCandidate[] = [];
+  const contextCandidates: ShuffleCandidate[] = [];
+
+  for (const cand of scored) {
+    if (typeof cand.radioIndex === 'number' && cand.radioIndex >= 0) {
+      radioCandidates.push(cand);
+    } else {
+      contextCandidates.push(cand);
+    }
+  }
+
+  return { radioCandidates, contextCandidates };
 }

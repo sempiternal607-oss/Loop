@@ -6,9 +6,9 @@ import {
 } from './types';
 import { createShuffleSession, normalizeArtistName } from './tasteProfile';
 import { isNonMusicContent } from '@/lib/ytmusic';
-import { getCandidateSongs } from './candidates';
+import { getCandidateSongs, partitionBySource } from './candidates';
 import { scoreCandidate } from './scoring';
-import { selectWeightedCandidates } from './selection';
+import { selectWeightedCandidates, selectDiscoveryMix } from './selection';
 
 export class SmartShuffleService {
   private session: ShuffleSession | null = null;
@@ -66,8 +66,15 @@ export class SmartShuffleService {
     const viableCandidates = scoredCandidates.filter((c) => c.finalScore > 0.01);
     const pool = viableCandidates.length > 0 ? viableCandidates : scoredCandidates;
 
-    // Select candidates using temperature-weighted sampling
-    const selected = selectWeightedCandidates(pool, count, context.config.temperature);
+    // Spotify-style discovery mix: radio recommendations (seeded from the
+    // current song) dominate the mix, the user's own queue tracks are woven in
+    const { radioCandidates, contextCandidates } = partitionBySource(pool);
+    const selected = selectDiscoveryMix(
+      radioCandidates,
+      contextCandidates,
+      count,
+      context.config.temperature
+    );
 
     // Cache the candidates for this seed
     this.candidateCache.set(context.currentSong.videoId, selected);
@@ -101,9 +108,11 @@ export class SmartShuffleService {
       }
     }
 
-    // 2. Radio enrichment — unbounded only, and only when the user's own pool is small
+    // 2. Radio enrichment — unbounded only. In discovery mode the radio pool
+    // (seeded from the CURRENT song) is the primary source, not a small-pool
+    // fallback, so unrelated context tracks can't dominate the queue.
     const radioIndexMap = new Map<string, number>();
-    if (!isBounded && uniqueMap.size < 10 && fetchRadioFn) {
+    if (!isBounded && fetchRadioFn) {
       try {
         const radioSongs = await fetchRadioFn(currentSong);
         radioSongs.forEach((s, idx) => {
@@ -146,17 +155,27 @@ export class SmartShuffleService {
       scoreCandidate(cand, context, radioIndexMap.get(cand.videoId))
     );
 
-    // 5. Select and order candidates using weighted probabilistic sampling.
-    //    Bounded mode must return every user song exactly once (a real shuffle of
-    //    the playlist); unbounded mode caps the queue as before.
-    const countToSelect = isBounded ? validSongs.length : Math.min(validSongs.length, 50);
-    const selected = selectWeightedCandidates(
-      scoredCandidates,
-      countToSelect,
+    // 5. Select and order candidates.
+    //    - Bounded mode: every user song exactly once (a real playlist shuffle)
+    //    - Unbounded mode: Spotify-style discovery mix — radio majority,
+    //      user context minority, interleaved
+    if (isBounded) {
+      const selected = selectWeightedCandidates(
+        scoredCandidates,
+        validSongs.length,
+        context.config.temperature
+      );
+      return selected.map((c) => c.song);
+    }
+
+    const { radioCandidates, contextCandidates } = partitionBySource(scoredCandidates);
+    const mixed = selectDiscoveryMix(
+      radioCandidates,
+      contextCandidates,
+      Math.min(validSongs.length, 50),
       context.config.temperature
     );
-
-    return selected.map((c) => c.song);
+    return mixed.map((c) => c.song);
   }
 
   /**
