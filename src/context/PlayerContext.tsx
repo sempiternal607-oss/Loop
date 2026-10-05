@@ -216,6 +216,15 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  // Mirrors playback into the smart-shuffle session history so the engine's
+  // anti-repetition signals (history cooldown, artist fatigue, recently-played
+  // filter) actually see what has played. Only meaningful while shuffle is ON.
+  const recordShufflePlay = useCallback((song: Song) => {
+    if (isShuffleRef.current) {
+      smartShuffleService.recordPlayedSong(song);
+    }
+  }, []);
+
   // Fetch SponsorBlock segments
   const fetchSponsorSegments = useCallback(async (videoId: string) => {
     try {
@@ -439,10 +448,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Fetch auxiliary data
+      recordShufflePlay(song);
       fetchSponsorSegments(song.videoId);
       fetchLyrics(song);
     },
-    [pushHistory, appendAutoRadioQueue, fetchRadioTracks, fetchSponsorSegments, fetchLyrics]
+    [pushHistory, recordShufflePlay, appendAutoRadioQueue, fetchRadioTracks, fetchSponsorSegments, fetchLyrics]
   );
 
   const playPlaylist = useCallback(
@@ -582,6 +592,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       setDuration(nextSong.duration || 0);
       setIsPlaying(true);
       pushHistory(nextSong);
+      recordShufflePlay(nextSong);
       fetchSponsorSegments(nextSong.videoId);
       fetchLyrics(nextSong);
 
@@ -731,7 +742,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         setIsPlaying(false);
       }
     }
-  }, [pushHistory, fetchSponsorSegments, fetchLyrics, fetchRadioTracks, appendAutoRadioQueue, showToast]);
+  }, [pushHistory, recordShufflePlay, fetchSponsorSegments, fetchLyrics, fetchRadioTracks, appendAutoRadioQueue, showToast]);
 
   const prev = useCallback(() => {
     if (progressRef.current > 3) {
@@ -754,12 +765,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       setDuration(prevSong.duration || 0);
       setIsPlaying(true);
       pushHistory(prevSong);
+      recordShufflePlay(prevSong);
       fetchSponsorSegments(prevSong.videoId);
       fetchLyrics(prevSong);
     } else {
       seek(0);
     }
-  }, [pushHistory, seek, fetchSponsorSegments, fetchLyrics]);
+  }, [pushHistory, recordShufflePlay, seek, fetchSponsorSegments, fetchLyrics]);
 
   const addToQueue = useCallback((song: Song, playNext = false) => {
     setQueue((prevQ) => {

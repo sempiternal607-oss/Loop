@@ -34,6 +34,40 @@ export class SmartShuffleService {
   }
 
   /**
+   * Records that a song has started playing in the active shuffle session.
+   *
+   * PlayerContext drives playback itself (it does not call getNextSong), so
+   * without this the session history would stay frozen at [seedSong] forever —
+   * which silently disabled three scoring signals: the history cooldown penalty,
+   * the rolling artist-fatigue window, and the recently-played candidate filter.
+   *
+   * Idempotent for the immediately-preceding entry so it can be called from both
+   * playSong and the playAtIndex path without double counting.
+   */
+  public recordPlayedSong(song: Song): void {
+    if (!this.session || !song) return;
+
+    const last = this.session.history[this.session.history.length - 1];
+    if (last?.videoId === song.videoId) {
+      this.session.currentSong = song;
+      this.session.lastPlayedTimestamp = Date.now();
+      return;
+    }
+
+    this.session.history.push(song);
+    this.session.historyIndex = this.session.history.length - 1;
+    this.session.currentSong = song;
+    this.session.lastPlayedTimestamp = Date.now();
+
+    const artistNorm = normalizeArtistName(song.artist);
+    if (artistNorm) {
+      this.session.playedArtistCounts[artistNorm] =
+        (this.session.playedArtistCounts[artistNorm] || 0) + 1;
+      this.session.recentArtists = [...this.session.recentArtists, artistNorm].slice(-6);
+    }
+  }
+
+  /**
    * Cleans up the active session when shuffle is turned OFF
    */
   public clearSession(): void {
@@ -252,16 +286,7 @@ export class SmartShuffleService {
     const chosenSong = nextCandidate.song;
 
     // 3. Update session state
-    this.session.history.push(chosenSong);
-    this.session.historyIndex = this.session.history.length - 1;
-    this.session.currentSong = chosenSong;
-    this.session.lastPlayedTimestamp = Date.now();
-
-    const artistNorm = normalizeArtistName(chosenSong.artist);
-    if (artistNorm) {
-      this.session.playedArtistCounts[artistNorm] = (this.session.playedArtistCounts[artistNorm] || 0) + 1;
-      this.session.recentArtists = [...this.session.recentArtists, artistNorm].slice(-6);
-    }
+    this.recordPlayedSong(chosenSong);
 
     // 4. Log decision for transparency and debugging
     this.logShuffleDecision(context.currentSong, chosenSong, nextCandidate);

@@ -49,7 +49,13 @@ export function normalizeArtistName(name: string): string {
   if (!name) return '';
   return name
     .toLowerCase()
-    .replace(/\s*(feat\.?|ft\.?|featuring|with|x|&|,|\/)\s*.*$/i, '')
+    // Strip explicit feature credits only: "A feat. B", "A ft. B", "A featuring B".
+    // The separator MUST be a whole token (leading whitespace required) — a bare
+    // /\s*(...)\s*/ here matches inside words and shredded real names
+    // ("Daft Punk" -> "da", "Soft Cell" -> "so", "X Ambassadors" -> "").
+    // Splitting on "&", ",", "/", "x" is deliberately NOT done: those appear in
+    // legitimate band names ("Simon & Garfunkel", "Earth, Wind & Fire", "AC/DC").
+    .replace(/\s+(?:feat\.?|ft\.?|featuring)(?:\s+.*)?$/i, '')
     .trim();
 }
 
